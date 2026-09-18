@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 
 const display = Barlow({
@@ -26,7 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${display.variable} ${mono.variable} h-full`}>
+    <html
+      lang="fr"
+      className={cn("h-full font-sans", display.variable, mono.variable)}
+    >
       <body className="min-h-full antialiased">
         {children}
         <Toaster theme="light" richColors position="top-right" />

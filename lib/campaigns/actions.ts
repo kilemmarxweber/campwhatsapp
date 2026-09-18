@@ -68,7 +68,6 @@ export async function createCampaign(input: {
           contactId: c.id,
           renderedBody: renderTemplate(input.bodyTemplate, {
             name: c.name ?? "",
-            prenom: c.name?.split(" ")[0] ?? "",
             phone: c.phone,
             email: c.email ?? "",
             ...((c.variables as Record<string, string>) ?? {}),

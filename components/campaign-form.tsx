@@ -35,7 +35,7 @@ export function CampaignForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
-  const [body, setBody] = useState("Bonjour {{prenom}}, ");
+  const [body, setBody] = useState("Bonjour {{name}}, ");
   const [messageType, setMessageType] = useState<"text" | "image" | "video">(
     "text",
   );
@@ -48,7 +48,6 @@ export function CampaignForm({
     if (!sample) return body;
     const vars = {
       name: sample.name ?? "",
-      prenom: sample.name?.split(" ")[0] ?? "",
       phone: sample.phone,
       ...((sample.variables as Record<string, string>) ?? {}),
     };
@@ -130,7 +129,7 @@ export function CampaignForm({
           </div>
         )}
         <div className="field md:col-span-2">
-          <label>Message (variables {"{{prenom}}"}, {"{{name}}"}, …)</label>
+          <label>Message (variables {"{{name}}"}, {"{{phone}}"}, …)</label>
           <textarea
             required
             rows={4}

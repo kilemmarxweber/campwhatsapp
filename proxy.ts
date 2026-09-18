@@ -12,7 +12,8 @@ function isProtected(pathname: string) {
   return (
     pathname.startsWith("/o/") ||
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/onboarding")
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/admin")
   );
 }
 

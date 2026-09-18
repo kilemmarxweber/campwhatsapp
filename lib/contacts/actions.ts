@@ -19,8 +19,8 @@ export async function createContact(input: {
     contacts: ["create"],
   });
 
-  const settings = await prisma.organizationKlambo.findUnique({
-    where: { organizationId: input.organizationId },
+  const settings = await prisma.klamboConfig.findUnique({
+    where: { id: "default" },
     select: { defaultCountry: true },
   });
   const phone = normalizePhone(
@@ -67,8 +67,8 @@ export async function importContactsFromExcel(input: {
     contacts: ["import"],
   });
 
-  const settings = await prisma.organizationKlambo.findUnique({
-    where: { organizationId: input.organizationId },
+  const settings = await prisma.klamboConfig.findUnique({
+    where: { id: "default" },
     select: { defaultCountry: true },
   });
   const country = (settings?.defaultCountry as CountryCode) || "CD";
@@ -147,3 +147,16 @@ export async function createContactList(input: {
   revalidatePath(`/o/${input.orgSlug}/contacts`);
   return list;
 }
+
+export async function deleteContactList(input: {
+  organizationId: string;
+  orgSlug: string;
+  listId: string;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["delete"],
+  });
+  await prisma.contactList.delete({ where: { id: input.listId } });
+  revalidatePath(`/o/${input.orgSlug}/contacts`);
+}
+

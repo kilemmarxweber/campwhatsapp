@@ -7,6 +7,7 @@ import {
   organizationRoleStatements,
 } from "@/lib/permissions";
 import { getUserOrganizationMembership } from "@/lib/auth/org-membership";
+import { parsePermission } from "@/lib/roles/permission-matrix";
 
 type PermissionMap = Record<string, string[]>;
 
@@ -34,7 +35,7 @@ export async function requireOrgMembership(organizationId: string) {
     organizationId,
   );
   if (!membership) {
-    throw new Error("Accès organisation refusé");
+    throw new Error("Accès succursale refusé");
   }
   return {
     session,
@@ -45,15 +46,29 @@ export async function requireOrgMembership(organizationId: string) {
   };
 }
 
-function roleAllows(
-  role: ReturnType<typeof normalizeOrgRole>,
+async function resolveRoleStatements(
+  organizationId: string,
+  role: string,
+): Promise<PermissionMap | null> {
+  const builtIn = organizationRoleStatements[role] as PermissionMap | undefined;
+  if (builtIn) return builtIn;
+
+  const orgRole = await prisma.organizationRole.findFirst({
+    where: { organizationId, role },
+  });
+  if (orgRole) return parsePermission(orgRole.permission);
+
+  const global = await prisma.globalRole.findUnique({ where: { slug: role } });
+  if (global) return parsePermission(global.permission);
+
+  return null;
+}
+
+function statementsAllow(
+  statements: PermissionMap,
   resource: string,
   action: string,
 ): boolean {
-  const statements = organizationRoleStatements[role] as
-    | PermissionMap
-    | undefined;
-  if (!statements) return false;
   const actions = statements[resource];
   return Array.isArray(actions) && actions.includes(action);
 }
@@ -80,13 +95,20 @@ export async function requireOrganizationPermission(
       return { session, membership };
     }
   } catch {
-    // fallback matrice locale
+    // fallback matrice locale / catalogue siège
   }
 
-  const role = membership.role;
+  const statements = await resolveRoleStatements(
+    organizationId,
+    membership.role,
+  );
+  if (!statements) {
+    throw new Error("Permission insuffisante");
+  }
+
   for (const [resource, actions] of Object.entries(permission)) {
     for (const action of actions) {
-      if (!roleAllows(role, resource, action)) {
+      if (!statementsAllow(statements, resource, action)) {
         throw new Error("Permission insuffisante");
       }
     }

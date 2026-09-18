@@ -25,7 +25,7 @@ export default async function HomePage() {
       </h1>
       <p className="mb-8 max-w-xl text-lg text-[var(--fg-muted)]">
         Distributeur exclusif TVS en R.D. Congo — créez des campagnes texte,
-        image ou vidéo et envoyez-les à vos clients via KlamboWhatsapp.
+        image ou vidéo et envoyez-les à vos clients depuis chaque succursale.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/auth/sign-in" className="btn btn-primary">

@@ -116,31 +116,31 @@ async function seedContacts(organizationId: string) {
       phone: "+243844000001",
       name: "Jean Mukendi",
       email: "jean.mukendi@example.com",
-      variables: { prenom: "Jean", ville: "Kinshasa", modele: "HLX 150" },
+      variables: { ville: "Kinshasa", modele: "HLX 150" },
     },
     {
       phone: "+243844000002",
       name: "Marie Kalala",
       email: "marie.kalala@example.com",
-      variables: { prenom: "Marie", ville: "Lubumbashi", modele: "NEO NX" },
+      variables: { ville: "Lubumbashi", modele: "NEO NX" },
     },
     {
       phone: "+243844000003",
       name: "Patrick Ilunga",
       email: null,
-      variables: { prenom: "Patrick", ville: "Goma", modele: "KING KARGO" },
+      variables: { ville: "Goma", modele: "KING KARGO" },
     },
     {
       phone: "+243844000004",
       name: "Grace Mwamba",
       email: "grace@example.com",
-      variables: { prenom: "Grace", ville: "Kinshasa", modele: "XL 100" },
+      variables: { ville: "Kinshasa", modele: "XL 100" },
     },
     {
       phone: "+243844000005",
       name: "David Tshisekedi",
       email: null,
-      variables: { prenom: "David", ville: "Lubumbashi", modele: "ZT 125" },
+      variables: { ville: "Lubumbashi", modele: "ZT 125" },
     },
   ];
 
@@ -230,21 +230,21 @@ async function seedTemplates(organizationId: string) {
       data: {
         organizationId,
         name: "Promo HLX",
-        body: "Bonjour {{prenom}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵",
+        body: "Bonjour {{name}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵",
       },
     }),
     prisma.messageTemplate.create({
       data: {
         organizationId,
         name: "Crédit moto",
-        body: "Salut {{prenom}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos : info@tvsrdcongo.com",
+        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos : info@tvsrdcongo.com",
       },
     }),
     prisma.messageTemplate.create({
       data: {
         organizationId,
         name: "Promo King Kargo",
-        body: "{{prenom}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
+        body: "{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
       },
     }),
   ]);
@@ -287,7 +287,6 @@ function renderBody(
       : {};
   const vars: Record<string, string> = {
     name: contact.name ?? "",
-    prenom: contact.name?.split(" ")[0] ?? "",
     phone: contact.phone,
     ...custom,
   };
@@ -313,11 +312,11 @@ async function seedCampaigns(
   });
 
   const textBody =
-    "Bonjour {{prenom}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵";
+    "Bonjour {{name}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵";
   const imageCaption =
-    "{{prenom}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.";
+    "{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.";
   const videoCaption =
-    "Salut {{prenom}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos agence {{ville}}.";
+    "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos agence {{ville}}.";
 
   const audience = contacts;
 

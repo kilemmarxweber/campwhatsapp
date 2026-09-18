@@ -5,6 +5,9 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   createContact,
+  createContactList,
+  deleteContact,
+  deleteContactList,
   importContactsFromExcel,
 } from "@/lib/contacts/actions";
 
@@ -21,6 +24,7 @@ export function ContactsClient({
   organizationId,
   orgSlug,
   contacts,
+  lists,
 }: {
   organizationId: string;
   orgSlug: string;
@@ -30,11 +34,24 @@ export function ContactsClient({
     name: string | null;
     email: string | null;
   }[];
+  lists: {
+    id: string;
+    name: string;
+    _count: { members: number };
+  }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [listName, setListName] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -122,33 +139,163 @@ export function ContactsClient({
         </div>
       </div>
 
+      <div className="surface flex flex-col gap-4 p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Listes</h2>
+            <p className="text-sm text-[var(--fg-muted)]">
+              Cochez des contacts puis créez une liste pour les campagnes.
+            </p>
+          </div>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (selected.length === 0) {
+                toast.error("Sélectionnez au moins un contact");
+                return;
+              }
+              startTransition(async () => {
+                try {
+                  await createContactList({
+                    organizationId,
+                    orgSlug,
+                    name: listName,
+                    contactIds: selected,
+                  });
+                  toast.success("Liste créée");
+                  setListName("");
+                  setSelected([]);
+                  router.refresh();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Erreur");
+                }
+              });
+            }}
+          >
+            <div className="field">
+              <label>Nom de liste</label>
+              <input
+                required
+                value={listName}
+                onChange={(e) => setListName(e.target.value)}
+                placeholder="ex. Prospects Kinshasa"
+              />
+            </div>
+            <button className="btn btn-primary" disabled={pending} type="submit">
+              Créer ({selected.length})
+            </button>
+          </form>
+        </div>
+        {lists.length === 0 ? (
+          <p className="text-sm text-[var(--fg-muted)]">
+            Aucune liste pour l’instant.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {lists.map((list) => (
+              <li
+                key={list.id}
+                className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2"
+              >
+                <div>
+                  <p className="font-medium">{list.name}</p>
+                  <p className="text-sm text-[var(--fg-muted)]">
+                    {list._count.members} contact
+                    {list._count.members === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={pending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      try {
+                        await deleteContactList({
+                          organizationId,
+                          orgSlug,
+                          listId: list.id,
+                        });
+                        toast.success("Liste supprimée");
+                        router.refresh();
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error ? err.message : "Erreur",
+                        );
+                      }
+                    });
+                  }}
+                >
+                  Supprimer
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="surface overflow-hidden">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Téléphone</th>
-              <th>Email</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.length === 0 ? (
+        {contacts.length === 0 ? (
+          <div className="p-8 text-center text-[var(--fg-muted)]">
+            Aucun contact — ajoutez-en un ou importez un Excel pour démarrer.
+          </div>
+        ) : (
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={3} className="text-[var(--fg-muted)]">
-                  Aucun contact
-                </td>
+                <th className="w-10" />
+                <th>Nom</th>
+                <th>Téléphone</th>
+                <th>Email</th>
+                <th />
               </tr>
-            ) : (
-              contacts.map((c) => (
+            </thead>
+            <tbody>
+              {contacts.map((c) => (
                 <tr key={c.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                      aria-label={`Sélectionner ${c.name || c.phone}`}
+                    />
+                  </td>
                   <td>{c.name || "—"}</td>
                   <td className="font-mono text-sm">{c.phone}</td>
                   <td>{c.email || "—"}</td>
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={pending}
+                      onClick={() => {
+                        startTransition(async () => {
+                          try {
+                            await deleteContact({
+                              organizationId,
+                              orgSlug,
+                              contactId: c.id,
+                            });
+                            toast.success("Contact supprimé");
+                            router.refresh();
+                          } catch (err) {
+                            toast.error(
+                              err instanceof Error ? err.message : "Erreur",
+                            );
+                          }
+                        });
+                      }}
+                    >
+                      Supprimer
+                    </button>
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

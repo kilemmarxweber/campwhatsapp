@@ -11,8 +11,13 @@ import {
   ORG_ROLE,
   applicationRoles,
   authAccessControl,
+  isAppAdminRole,
   organizationRoles,
 } from "@/lib/permissions";
+import {
+  seedSystemGlobalRoles,
+  syncAllGlobalRolesToOrg,
+} from "@/lib/roles/sync";
 
 const authOptions = {
   database: prismaAdapter(prisma, {
@@ -40,18 +45,30 @@ const authOptions = {
     organization({
       ac: authAccessControl,
       creatorRole: ORG_ROLE.OWNER,
-      allowUserToCreateOrganization: async () => true,
+      allowUserToCreateOrganization: async (user) => {
+        return isAppAdminRole(user.role);
+      },
       organizationLimit: async () => false,
       dynamicAccessControl: {
         enabled: true,
       },
       roles: organizationRoles,
+      // En prod : brancher un vrai SMTP. En local : invitation créée quand même.
+      sendInvitationEmail: async (data) => {
+        console.info(
+          `[invite] ${data.email} → ${data.organization.name} (${data.invitation.role})`,
+        );
+      },
       organizationHooks: {
         beforeAddMember: async ({ user, organization }) => {
           await assertUserCanJoinOrganization(user.id, organization.id);
         },
         beforeAcceptInvitation: async ({ user, organization }) => {
           await assertUserCanJoinOrganization(user.id, organization.id);
+        },
+        afterCreateOrganization: async ({ organization }) => {
+          await seedSystemGlobalRoles();
+          await syncAllGlobalRolesToOrg(organization.id);
         },
       },
     }),

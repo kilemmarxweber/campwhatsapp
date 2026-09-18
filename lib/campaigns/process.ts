@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import prisma from "@/lib/prisma";
-import { getKlamboClientForOrg } from "@/lib/klambo/org";
+import { getKlamboClient } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 
 const SEND_DELAY_MS = 200;
@@ -24,7 +24,6 @@ function contactVars(contact: {
       : {};
   return {
     name: contact.name ?? "",
-    prenom: contact.name?.split(" ")[0] ?? "",
     phone: contact.phone,
     email: contact.email ?? "",
     ...Object.fromEntries(
@@ -54,7 +53,7 @@ export async function processCampaign(campaignId: string) {
     data: { status: "sending", startedAt: new Date() },
   });
 
-  const { client } = await getKlamboClientForOrg(campaign.organizationId);
+  const { client } = await getKlamboClient();
 
   let klamboMediaId = campaign.media?.klamboMediaId ?? null;
 

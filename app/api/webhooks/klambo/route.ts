@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyKlamboSignature } from "@/lib/klambo/org";
+import { getKlamboConfig, verifyKlamboSignature } from "@/lib/klambo/org";
 
 type WebhookBody = {
   id?: string;
@@ -50,9 +50,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, unmatched: true });
   }
 
-  const settings = await prisma.organizationKlambo.findUnique({
-    where: { organizationId: recipient.campaign.organizationId },
-  });
+  const settings = await getKlamboConfig();
 
   if (settings?.webhookSecret) {
     const valid = verifyKlamboSignature(

@@ -34,11 +34,14 @@ export const ALL_ORG_ROLE_SLUGS = [
 
 export function normalizeOrgRole(
   raw: string | null | undefined,
-): (typeof ALL_ORG_ROLE_SLUGS)[number] {
+): (typeof ALL_ORG_ROLE_SLUGS)[number] | string {
   const r = (raw ?? "").trim().toLowerCase();
+  if (!r) return ORG_ROLE.USER;
   if (r === ORG_ROLE.OWNER) return ORG_ROLE.OWNER;
   if (r === ORG_ROLE.ADMIN) return ORG_ROLE.ADMIN;
-  return ORG_ROLE.USER;
+  if (r === ORG_ROLE.USER) return ORG_ROLE.USER;
+  // Rôles custom du catalogue siège — conserver le slug
+  return r;
 }
 
 /** Ressources métier TVS (campagnes WhatsApp). */
