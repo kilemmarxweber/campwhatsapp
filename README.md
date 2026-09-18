@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TVS — Campagnes WhatsApp
 
-## Getting Started
+App multi-organisation pour créer et envoyer des campagnes WhatsApp (texte, image, vidéo) avec texte dynamique, via **KlamboWhatsapp**.
 
-First, run the development server:
+## Stack
+
+- Next.js 16.3 + React 19
+- Prisma 7.10 + PostgreSQL
+- Better Auth (organizations)
+- Klambo API (`POST /v1/send`, `POST /v1/media`)
+
+## Démarrage
+
+1. Copier `.env.example` → `.env` et renseigner `DATABASE_URL`
+2. Créer la base Postgres `tvs`
+3. Installer et migrer :
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+pnpm prisma generate
+pnpm prisma migrate dev --name init
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Ouvrir http://localhost:3000 → s'inscrire → créer une organisation
+5. Paramètres → coller la clé Klambo (`sk_test_…` / `sk_live_…`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Fonctionnalités
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Organisations + membres (Better Auth)
+- Contacts CRUD + import Excel (`phone`, `name`, variables libres)
+- Templates de messages `{{prenom}}`, `{{name}}`, …
+- Campagnes texte / image / vidéo avec file d'envoi
+- Upload médias (limites Klambo : image 5 Mo, vidéo 16 Mo)
+- Webhook statut : `POST /api/webhooks/klambo`
+- Relance des destinataires en échec
 
-## Learn More
+## Excel
 
-To learn more about Next.js, take a look at the following resources:
+Colonnes reconnues : `phone` / `telephone` / `tel`, `name` / `nom`, `email`. Toute autre colonne devient une variable de template.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Klambo
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Base URL par défaut : `https://whatsapp-api.klambocore.com`
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Webhook events attendus : `message.sent`, `message.delivered`, `message.read`, `message.failed` (header `X-Signature` HMAC).
