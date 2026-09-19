@@ -47,9 +47,27 @@ export default async function EditCampaignPage({
         body: true,
         messageType: true,
         mediaId: true,
+        link1Label: true,
+        link1Url: true,
+        link2Label: true,
+        link2Url: true,
       },
     }),
   ]);
+
+  const matchedTemplate =
+    templates.find(
+      (t) =>
+        t.messageType === campaign.messageType &&
+        t.mediaId === campaign.mediaId &&
+        campaign.bodyTemplate.startsWith(t.body.trim()),
+    ) ??
+    templates.find(
+      (t) =>
+        t.messageType === campaign.messageType &&
+        t.mediaId === campaign.mediaId,
+    ) ??
+    templates[0];
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,6 +90,7 @@ export default async function EditCampaignPage({
           mediaId: campaign.mediaId,
           contactListId: campaign.contactListId,
           contactIds: campaign.recipients.map((r) => r.contactId),
+          templateId: matchedTemplate?.id,
         }}
       />
     </div>

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignActions } from "@/components/campaign-actions";
-import { MediaThumb } from "@/components/media-thumb";
+import { MessageCardPreview } from "@/components/message-card-preview";
+import { renderTemplate } from "@/lib/campaigns/render-template";
 
 export default async function CampaignDetailPage({
   params,
@@ -24,6 +25,14 @@ export default async function CampaignDetailPage({
     },
   });
   if (!campaign) notFound();
+
+  const sample = campaign.recipients[0]?.contact;
+  const previewCaption = sample
+    ? renderTemplate(campaign.bodyTemplate, {
+        name: sample.name ?? "",
+        phone: sample.phone,
+      })
+    : campaign.bodyTemplate;
 
   const stats = {
     total: campaign.recipients.length,
@@ -69,30 +78,34 @@ export default async function CampaignDetailPage({
         ))}
       </div>
 
-      <div className="surface grid gap-4 p-5 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
         <div>
+          <p className="mb-2 text-sm font-medium text-[var(--tvs-blue-deep)]">
+            Carte envoyée
+          </p>
+          <MessageCardPreview
+            messageType={campaign.messageType}
+            caption={previewCaption}
+            media={
+              campaign.media
+                ? {
+                    storagePath: campaign.media.storagePath,
+                    kind: campaign.media.kind,
+                    filename: campaign.media.filename,
+                  }
+                : null
+            }
+          />
+        </div>
+        <div className="surface p-5">
           <p className="mb-2 text-sm text-[var(--fg-muted)]">
-            Message / légende
+            Template brut
+            {campaign.media?.klamboMediaId ? " · Klambo OK" : ""}
           </p>
           <pre className="whitespace-pre-wrap font-sans text-sm">
             {campaign.bodyTemplate}
           </pre>
         </div>
-        {campaign.media ? (
-          <div>
-            <p className="mb-2 text-sm text-[var(--fg-muted)]">
-              Média · {campaign.media.filename}
-              {campaign.media.klamboMediaId ? " · Klambo OK" : ""}
-            </p>
-            <MediaThumb
-              storagePath={campaign.media.storagePath}
-              kind={campaign.media.kind}
-              filename={campaign.media.filename}
-            />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--fg-muted)]">Pas de média</p>
-        )}
       </div>
 
       <div className="surface overflow-hidden">

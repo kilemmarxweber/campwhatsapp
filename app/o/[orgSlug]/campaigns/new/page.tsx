@@ -36,6 +36,10 @@ export default async function NewCampaignPage({
         body: true,
         messageType: true,
         mediaId: true,
+        link1Label: true,
+        link1Url: true,
+        link2Label: true,
+        link2Url: true,
       },
     }),
   ]);
@@ -45,7 +49,7 @@ export default async function NewCampaignPage({
       <div>
         <h1 className="text-2xl font-semibold">Nouvelle campagne</h1>
         <p className="text-[var(--fg-muted)]">
-          Message dynamique + audience + envoi Klambo
+          Choisissez un template, ajoutez un texte court, puis l&apos;audience
         </p>
       </div>
       <CampaignForm

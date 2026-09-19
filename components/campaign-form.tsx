@@ -1,11 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
+import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { renderTemplate } from "@/lib/campaigns/render-template";
-import { MediaThumb } from "@/components/media-thumb";
+import { MessageCardPreview } from "@/components/message-card-preview";
 
 type Contact = {
   id: string;
@@ -22,6 +23,10 @@ type Template = {
   body: string;
   messageType: "text" | "image" | "video";
   mediaId: string | null;
+  link1Label: string | null;
+  link1Url: string | null;
+  link2Label: string | null;
+  link2Url: string | null;
 };
 
 type InitialCampaign = {
@@ -32,6 +37,9 @@ type InitialCampaign = {
   mediaId: string | null;
   contactListId: string | null;
   contactIds: string[];
+  /** Best-effort match to a template for edit. */
+  templateId?: string;
+  note?: string;
 };
 
 export function CampaignForm({
@@ -54,25 +62,35 @@ export function CampaignForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(initial?.name ?? "");
-  const [body, setBody] = useState(initial?.bodyTemplate ?? "Bonjour {{name}}, ");
-  const [messageType, setMessageType] = useState<"text" | "image" | "video">(
-    initial?.messageType ?? "text",
+  const [templateId, setTemplateId] = useState(
+    initial?.templateId ?? templates[0]?.id ?? "",
   );
-  const [mediaId, setMediaId] = useState(initial?.mediaId ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
   const [listId, setListId] = useState(initial?.contactListId ?? "");
   const [selected, setSelected] = useState<string[]>(initial?.contactIds ?? []);
   const isEdit = Boolean(initial);
 
-  const preview = useMemo(() => {
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => t.id === templateId) ?? null,
+    [templates, templateId],
+  );
+
+  const selectedMedia = useMemo(() => {
+    if (!selectedTemplate?.mediaId) return null;
+    return media.find((m) => m.id === selectedTemplate.mediaId) ?? null;
+  }, [media, selectedTemplate]);
+
+  const captionPreview = useMemo(() => {
+    if (!selectedTemplate) return note;
+    const composed = composeTemplateCaption(selectedTemplate.body, selectedTemplate, note);
     const sample = contacts[0];
-    if (!sample) return body;
-    const vars = {
+    if (!sample) return composed;
+    return renderTemplate(composed, {
       name: sample.name ?? "",
       phone: sample.phone,
       ...((sample.variables as Record<string, string>) ?? {}),
-    };
-    return renderTemplate(body, vars);
-  }, [body, contacts]);
+    });
+  }, [selectedTemplate, note, contacts]);
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -85,6 +103,10 @@ export function CampaignForm({
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!templateId) {
+          toast.error("Choisissez un template");
+          return;
+        }
         startTransition(async () => {
           try {
             if (isEdit && initial) {
@@ -93,9 +115,8 @@ export function CampaignForm({
                 orgSlug,
                 campaignId: initial.id,
                 name,
-                bodyTemplate: body,
-                messageType,
-                mediaId: mediaId || null,
+                templateId,
+                note,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
               });
@@ -106,9 +127,8 @@ export function CampaignForm({
                 organizationId,
                 orgSlug,
                 name,
-                bodyTemplate: body,
-                messageType,
-                mediaId: mediaId || null,
+                templateId,
+                note,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
                 sendNow: true,
@@ -123,116 +143,69 @@ export function CampaignForm({
         });
       }}
     >
-      <div className="surface grid gap-4 p-5 md:grid-cols-2">
-        <div className="field">
-          <label htmlFor="campaign-name">Nom de la campagne</label>
-          <input
-            id="campaign-name"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex. Promo Mars — Kinshasa"
-            className="text-[var(--fg)]"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="campaign-type">Type</label>
-          <select
-            id="campaign-type"
-            value={messageType}
-            onChange={(e) =>
-              setMessageType(e.target.value as "text" | "image" | "video")
-            }
-          >
-            <option value="text">Texte</option>
-            <option value="image">Image + légende</option>
-            <option value="video">Vidéo + légende</option>
-          </select>
-        </div>
-        {(messageType === "image" || messageType === "video") && (
-          <div className="field md:col-span-2">
-            <label htmlFor="campaign-media">Média</label>
-            <select
-              id="campaign-media"
+      <div className="grid gap-6 lg:grid-cols-[1fr_minmax(280px,340px)]">
+        <div className="surface flex flex-col gap-4 p-5">
+          <div className="field">
+            <label htmlFor="campaign-name">Nom de la campagne</label>
+            <input
+              id="campaign-name"
               required
-              value={mediaId}
-              onChange={(e) => setMediaId(e.target.value)}
-            >
-              <option value="">Choisir…</option>
-              {media
-                .filter((m) => m.kind === messageType)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.filename}
-                  </option>
-                ))}
-            </select>
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex. Promo Mars — Kinshasa"
+            />
           </div>
-        )}
-        <div className="field md:col-span-2">
-          <label htmlFor="campaign-body">
-            Message (variables {"{{name}}"}, {"{{phone}}"}, …)
-          </label>
-          <textarea
-            id="campaign-body"
-            required
-            rows={4}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
-        </div>
-        {templates.length > 0 && (
-          <div className="field md:col-span-2">
-            <label htmlFor="campaign-template">Charger un template</label>
+
+          <div className="field">
+            <label htmlFor="campaign-template">Template (image + style + liens)</label>
             <select
               id="campaign-template"
-              defaultValue=""
-              onChange={(e) => {
-                const t = templates.find((x) => x.id === e.target.value);
-                if (!t) return;
-                setBody(t.body);
-                setMessageType(t.messageType);
-                setMediaId(t.mediaId ?? "");
-                toast.message(
-                  t.messageType === "text"
-                    ? "Template texte chargé"
-                    : `Template ${t.messageType} + média chargés`,
-                );
-              }}
+              required
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
             >
-              <option value="">—</option>
+              <option value="">Choisir…</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.messageType}
-                  {t.mediaId ? " + média" : ""})
+                  {t.link1Url ? " · liens" : ""})
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-[var(--fg-muted)]">
+              Le média, le style du texte et les liens viennent du template.
+            </p>
           </div>
-        )}
-        <div className="surface bg-[var(--bg-soft)] p-4 md:col-span-2">
-          <p className="mb-1 text-xs text-[var(--fg-muted)]">Aperçu</p>
-          <p className="mb-1 text-xs text-[var(--fg-muted)]">
-            Type : {messageType}
-            {mediaId
-              ? ` · ${media.find((m) => m.id === mediaId)?.filename ?? "média"}`
-              : ""}
+
+          <div className="field">
+            <label htmlFor="campaign-note">Texte additionnel (optionnel)</label>
+            <textarea
+              id="campaign-note"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ex. Offre valable jusqu’au 30 mars — Kinshasa uniquement."
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
+            Aperçu (template + note)
           </p>
-          <p className="whitespace-pre-wrap text-[var(--fg)]">{preview}</p>
-          {mediaId &&
-            (() => {
-              const m = media.find((x) => x.id === mediaId);
-              if (!m?.storagePath) return null;
-              return (
-                <div className="mt-3 max-w-sm">
-                  <MediaThumb
-                    storagePath={m.storagePath}
-                    kind={m.kind}
-                    filename={m.filename}
-                  />
-                </div>
-              );
-            })()}
+          <MessageCardPreview
+            messageType={selectedTemplate?.messageType ?? "text"}
+            caption={captionPreview}
+            media={
+              selectedMedia?.storagePath
+                ? {
+                    storagePath: selectedMedia.storagePath,
+                    kind: selectedMedia.kind,
+                    filename: selectedMedia.filename,
+                  }
+                : null
+            }
+          />
         </div>
       </div>
 

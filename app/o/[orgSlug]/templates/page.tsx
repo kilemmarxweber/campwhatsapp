@@ -22,6 +22,10 @@ export default async function TemplatesPage({
         body: true,
         messageType: true,
         mediaId: true,
+        link1Label: true,
+        link1Url: true,
+        link2Label: true,
+        link2Url: true,
         media: { select: { id: true, filename: true, kind: true, storagePath: true } },
       },
     }),
@@ -37,7 +41,8 @@ export default async function TemplatesPage({
       <div>
         <h1 className="text-2xl font-semibold">Templates</h1>
         <p className="text-[var(--fg-muted)]">
-          Messages réutilisables avec texte, image ou vidéo
+          Image, style du texte et liens — la campagne n&apos;ajoute qu&apos;un
+          texte court
         </p>
       </div>
       <TemplatesClient

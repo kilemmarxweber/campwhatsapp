@@ -233,6 +233,12 @@ async function seedTemplates(
     },
   });
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_SITE_URL?.trim() ||
+    "https://www.tvsrdcongo.com/";
+  const creditUrl =
+    process.env.NEXT_PUBLIC_APP_CREDIT_URL?.trim() || siteUrl;
+
   const templates = await Promise.all([
     prisma.messageTemplate.create({
       data: {
@@ -240,6 +246,8 @@ async function seedTemplates(
         name: "Promo HLX",
         messageType: "text",
         body: "Bonjour {{name}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵",
+        link1Label: "Site TVS",
+        link1Url: siteUrl,
       },
     }),
     prisma.messageTemplate.create({
@@ -248,7 +256,11 @@ async function seedTemplates(
         name: "Promo King Kargo",
         messageType: "image",
         mediaId: media.image.id,
-        body: "{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
+        body: "*KING KARGO*\n\n{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
+        link1Label: "Site TVS",
+        link1Url: siteUrl,
+        link2Label: "Crédit moto",
+        link2Url: creditUrl,
       },
     }),
     prisma.messageTemplate.create({
@@ -258,6 +270,8 @@ async function seedTemplates(
         messageType: "video",
         mediaId: media.video.id,
         body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos agence {{ville}}.",
+        link1Label: "Crédit moto",
+        link1Url: creditUrl,
       },
     }),
     prisma.messageTemplate.create({
@@ -265,11 +279,13 @@ async function seedTemplates(
         organizationId,
         name: "Crédit moto",
         messageType: "text",
-        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos : info@tvsrdcongo.com",
+        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure.",
+        link1Label: "Crédit moto",
+        link1Url: creditUrl,
       },
     }),
   ]);
-  console.log(`✓ ${templates.length} templates (texte / image / vidéo)`);
+  console.log(`✓ ${templates.length} templates (texte / image / vidéo + liens)`);
   return templates;
 }
 
