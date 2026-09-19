@@ -11,6 +11,7 @@ import {
   retryFailedRecipients,
   startCampaign,
 } from "@/lib/campaigns/actions";
+import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 
 export function CampaignActions({
   organizationId,
@@ -70,16 +71,15 @@ export function CampaignActions({
         </button>
       )}
       {canResend && (
-        <button
-          type="button"
+        <ConfirmAlertDialogButton
           className="btn btn-primary"
+          pending={pending}
           disabled={pending}
-          onClick={() => {
-            if (
-              !confirm("Renvoyer cette campagne à tous les destinataires ?")
-            ) {
-              return;
-            }
+          title="Renvoyer la campagne ?"
+          description="Tous les destinataires seront remis en file et recevront à nouveau le message (délai ~14 s entre chaque envoi)."
+          confirmLabel="Renvoyer"
+          variant="default"
+          onConfirm={() =>
             startTransition(async () => {
               try {
                 await resendCampaign({ organizationId, orgSlug, campaignId });
@@ -88,11 +88,11 @@ export function CampaignActions({
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erreur");
               }
-            });
-          }}
+            })
+          }
         >
           Renvoyer
-        </button>
+        </ConfirmAlertDialogButton>
       )}
       {failedCount > 0 && (
         <button
@@ -127,14 +127,15 @@ export function CampaignActions({
         </Link>
       )}
       {canDelete && (
-        <button
-          type="button"
+        <ConfirmAlertDialogButton
           className="btn btn-danger"
+          pending={pending}
           disabled={pending}
-          onClick={() => {
-            if (!confirm("Supprimer définitivement cette campagne ?")) {
-              return;
-            }
+          title="Supprimer la campagne ?"
+          description="Cette action est définitive. Les destinataires et l’historique d’envoi seront effacés."
+          confirmLabel="Supprimer"
+          variant="destructive"
+          onConfirm={() =>
             startTransition(async () => {
               try {
                 await deleteCampaign({ organizationId, orgSlug, campaignId });
@@ -144,11 +145,11 @@ export function CampaignActions({
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erreur");
               }
-            });
-          }}
+            })
+          }
         >
           Supprimer
-        </button>
+        </ConfirmAlertDialogButton>
       )}
     </div>
   );

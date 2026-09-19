@@ -58,7 +58,7 @@ export default async function CampaignsPage({
         </Link>
       </div>
 
-      <div className="surface overflow-hidden">
+      <div className="surface overflow-x-auto">
         <table className="table">
           <thead>
             <tr>

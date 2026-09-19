@@ -6,8 +6,9 @@ import { requireOrganizationPermission } from "@/lib/auth/organization-permissio
 import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { enqueueCampaign } from "@/lib/campaigns/process";
 import { renderTemplate } from "@/lib/campaigns/render-template";
-import { writeOrgUpload } from "@/lib/upload-file.server";
+import { writeOrgUpload, resolveUploadAbsolutePath } from "@/lib/upload-file.server";
 import { getKlamboClient } from "@/lib/klambo/org";
+import fs from "fs/promises";
 
 async function resolveCampaignContent(input: {
   organizationId: string;
@@ -454,6 +455,50 @@ export async function uploadMediaAsset(input: {
 
   revalidatePath(`/o/${input.orgSlug}/media`);
   return asset;
+}
+
+export async function deleteMediaAsset(input: {
+  organizationId: string;
+  orgSlug: string;
+  mediaId: string;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    media: ["delete"],
+  });
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: {
+      id: input.mediaId,
+      organizationId: input.organizationId,
+    },
+  });
+  if (!asset) throw new Error("Média introuvable");
+
+  const sending = await prisma.campaign.count({
+    where: {
+      organizationId: input.organizationId,
+      mediaId: asset.id,
+      status: "sending",
+    },
+  });
+  if (sending > 0) {
+    throw new Error(
+      "Ce média est utilisé par une campagne en cours d'envoi — annulez-la d'abord",
+    );
+  }
+
+  await prisma.mediaAsset.delete({ where: { id: asset.id } });
+
+  try {
+    const absolute = await resolveUploadAbsolutePath(asset.storagePath);
+    await fs.unlink(absolute);
+  } catch {
+    // Fichier déjà absent : on ignore
+  }
+
+  revalidatePath(`/o/${input.orgSlug}/media`);
+  revalidatePath(`/o/${input.orgSlug}/templates`);
+  revalidatePath(`/o/${input.orgSlug}/campaigns/new`);
 }
 
 export async function createTemplate(input: {

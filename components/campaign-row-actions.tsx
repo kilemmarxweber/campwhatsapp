@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  deleteCampaign,
-  resendCampaign,
-} from "@/lib/campaigns/actions";
+import { deleteCampaign, resendCampaign } from "@/lib/campaigns/actions";
+import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 
 export function CampaignRowActions({
   organizationId,
@@ -30,20 +28,15 @@ export function CampaignRowActions({
   return (
     <div className="flex flex-wrap items-center justify-end gap-1">
       {canResend ? (
-        <button
-          type="button"
+        <ConfirmAlertDialogButton
           className="btn btn-ghost !px-2 !py-2"
+          pending={pending}
           disabled={pending}
-          title="Renvoyer"
-          aria-label="Renvoyer"
-          onClick={() => {
-            if (
-              !confirm(
-                "Renvoyer cette campagne à tous les destinataires ?",
-              )
-            ) {
-              return;
-            }
+          title="Renvoyer la campagne ?"
+          description="Tous les destinataires seront remis en file et recevront à nouveau le message."
+          confirmLabel="Renvoyer"
+          variant="default"
+          onConfirm={() =>
             startTransition(async () => {
               try {
                 await resendCampaign({
@@ -57,11 +50,11 @@ export function CampaignRowActions({
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erreur");
               }
-            });
-          }}
+            })
+          }
         >
-          <RefreshCw className="size-4" />
-        </button>
+          <RefreshCw className="size-4" aria-label="Renvoyer" />
+        </ConfirmAlertDialogButton>
       ) : null}
       {canEdit ? (
         <Link
@@ -74,16 +67,15 @@ export function CampaignRowActions({
         </Link>
       ) : null}
       {canDelete ? (
-        <button
-          type="button"
+        <ConfirmAlertDialogButton
           className="btn btn-danger !px-2 !py-2"
+          pending={pending}
           disabled={pending}
-          title="Supprimer"
-          aria-label="Supprimer"
-          onClick={() => {
-            if (!confirm("Supprimer définitivement cette campagne ?")) {
-              return;
-            }
+          title="Supprimer la campagne ?"
+          description="Cette action est définitive. Les destinataires et l’historique d’envoi seront effacés."
+          confirmLabel="Supprimer"
+          variant="destructive"
+          onConfirm={() =>
             startTransition(async () => {
               try {
                 await deleteCampaign({
@@ -96,11 +88,11 @@ export function CampaignRowActions({
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erreur");
               }
-            });
-          }}
+            })
+          }
         >
-          <Trash2 className="size-4" />
-        </button>
+          <Trash2 className="size-4" aria-label="Supprimer" />
+        </ConfirmAlertDialogButton>
       ) : null}
     </div>
   );
