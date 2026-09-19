@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { encryptSecret, maskApiKey, decryptSecret } from "@/lib/crypto";
 import { isAppAdminRole } from "@/lib/permissions";
+import { KlamboClient } from "@/lib/klambo/client";
 import { getKlamboDefaults } from "@/lib/klambo/env";
 import { registerKlamboWebhook } from "@/lib/klambo/provision";
 import { KLAMBO_CONFIG_ID } from "@/lib/klambo/org";
@@ -16,6 +17,25 @@ async function requireAppAdmin() {
     throw new Error("Réservé aux administrateurs siège");
   }
   return session;
+}
+
+async function assertKlamboKeyWorks(apiKey: string, baseUrl: string) {
+  const client = new KlamboClient(apiKey, baseUrl);
+  try {
+    await client.getProject();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("401") || /Invalid API key/i.test(msg)) {
+      const isProdHost = /klambocore\.com/i.test(baseUrl);
+      const isTestKey = apiKey.startsWith("sk_test_");
+      throw new Error(
+        isProdHost && isTestKey
+          ? "Clé rejetée (401). Une clé sk_test_ ne marche pas sur whatsapp-api.klambocore.com — créez une sk_live_ dans la console, ou pointez la Base URL vers votre API locale."
+          : `Clé rejetée par ${baseUrl} (401). Vérifiez la clé et la Base URL (même environnement).`,
+      );
+    }
+    throw new Error(`Impossible de joindre Klambo (${baseUrl}): ${msg}`);
+  }
 }
 
 export async function saveKlamboSettings(input: {
@@ -53,6 +73,12 @@ export async function saveKlamboSettings(input: {
     existing?.defaultCountry ||
     defaults.defaultCountry;
 
+  if (!apiKeyForWebhook) {
+    throw new Error("Clé API manquante");
+  }
+
+  await assertKlamboKeyWorks(apiKeyForWebhook, baseUrl);
+
   await prisma.klamboConfig.upsert({
     where: { id: KLAMBO_CONFIG_ID },
     create: {
@@ -68,9 +94,7 @@ export async function saveKlamboSettings(input: {
     },
   });
 
-  if (apiKeyForWebhook) {
-    await registerKlamboWebhook(apiKeyForWebhook, baseUrl);
-  }
+  await registerKlamboWebhook(apiKeyForWebhook, baseUrl);
 
   revalidatePath("/admin");
   revalidatePath("/admin/klambo");

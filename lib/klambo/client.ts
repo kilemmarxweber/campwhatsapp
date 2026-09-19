@@ -64,6 +64,16 @@ export class KlamboClient {
     return this.request<KlamboSendResponse>(`/v1/messages/${id}`);
   }
 
+  /** Vérifie que la clé est acceptée par l'API (auth seule). */
+  async getProject() {
+    return this.request<{
+      id: string;
+      name: string;
+      slug: string;
+      is_test?: boolean;
+    }>("/v1/project");
+  }
+
   async send(payload: KlamboSendPayload) {
     const result = await this.request<KlamboSendResponse>("/v1/send", {
       method: "POST",

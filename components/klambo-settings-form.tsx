@@ -135,6 +135,12 @@ export function KlamboSettingsForm({
             >
               whatsapp.klambocore.com
             </a>
+            . Pour la prod, utilisez une clé{" "}
+            <code className="font-mono">sk_live_…</code> avec Base URL{" "}
+            <code className="font-mono">https://whatsapp-api.klambocore.com</code>
+            . Une clé <code className="font-mono">sk_test_…</code> locale
+            nécessite une Base URL locale (ex.{" "}
+            <code className="font-mono">http://localhost:3005</code>).
           </p>
         </div>
 
