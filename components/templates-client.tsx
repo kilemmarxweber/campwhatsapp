@@ -3,7 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createTemplate, deleteTemplate } from "@/lib/campaigns/actions";
+import {
+  createTemplate,
+  deleteTemplate,
+  updateTemplate,
+} from "@/lib/campaigns/actions";
 import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { MediaThumb } from "@/components/media-thumb";
@@ -34,6 +38,8 @@ type TemplateRow = {
   } | null;
 };
 
+const DEFAULT_BODY = "Bonjour {{name}},\n\nDécouvrez nos offres TVS Motors.";
+
 export function TemplatesClient({
   organizationId,
   orgSlug,
@@ -47,10 +53,9 @@ export function TemplatesClient({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [body, setBody] = useState(
-    "Bonjour {{name}},\n\nDécouvrez nos offres TVS Motors.",
-  );
+  const [body, setBody] = useState(DEFAULT_BODY);
   const [messageType, setMessageType] = useState<"text" | "image" | "video">(
     "image",
   );
@@ -77,6 +82,33 @@ export function TemplatesClient({
     [body, textStyle, link1Label, link1Url, link2Label, link2Url],
   );
 
+  function resetForm() {
+    setEditingId(null);
+    setName("");
+    setBody(DEFAULT_BODY);
+    setMessageType("image");
+    setMediaId("");
+    setTextStyle("normal");
+    setLink1Label("Site TVS");
+    setLink1Url(APP_LINKS[0].url);
+    setLink2Label("");
+    setLink2Url("");
+  }
+
+  function loadTemplate(t: TemplateRow) {
+    setEditingId(t.id);
+    setName(t.name);
+    setBody(t.body);
+    setMessageType(t.messageType);
+    setMediaId(t.mediaId ?? "");
+    setTextStyle("normal");
+    setLink1Label(t.link1Label ?? "Site TVS");
+    setLink1Url(t.link1Url ?? APP_LINKS[0].url);
+    setLink2Label(t.link2Label ?? "");
+    setLink2Url(t.link2Url ?? "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function fillLinkSlot(slot: 1 | 2, label: string, url: string) {
     if (slot === 1) {
       setLink1Label(label);
@@ -88,6 +120,19 @@ export function TemplatesClient({
     toast.message(`${label} → lien ${slot}`);
   }
 
+  const payload = {
+    organizationId,
+    orgSlug,
+    name,
+    body: applyTextStyle(body, textStyle),
+    messageType,
+    mediaId: mediaId || null,
+    link1Label: link1Url.trim() ? link1Label : null,
+    link1Url: link1Url.trim() || null,
+    link2Label: link2Url.trim() ? link2Label : null,
+    link2Url: link2Url.trim() || null,
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <form
@@ -96,28 +141,14 @@ export function TemplatesClient({
           e.preventDefault();
           startTransition(async () => {
             try {
-              await createTemplate({
-                organizationId,
-                orgSlug,
-                name,
-                body: applyTextStyle(body, textStyle),
-                messageType,
-                mediaId: mediaId || null,
-                link1Label: link1Url.trim() ? link1Label : null,
-                link1Url: link1Url.trim() || null,
-                link2Label: link2Url.trim() ? link2Label : null,
-                link2Url: link2Url.trim() || null,
-              });
-              toast.success("Template créé (image + texte + liens)");
-              setName("");
-              setBody("Bonjour {{name}},\n\nDécouvrez nos offres TVS Motors.");
-              setMessageType("image");
-              setMediaId("");
-              setTextStyle("normal");
-              setLink1Label("Site TVS");
-              setLink1Url(APP_LINKS[0].url);
-              setLink2Label("");
-              setLink2Url("");
+              if (editingId) {
+                await updateTemplate({ ...payload, templateId: editingId });
+                toast.success("Template mis à jour");
+              } else {
+                await createTemplate(payload);
+                toast.success("Template créé (image + texte + liens)");
+              }
+              resetForm();
               router.refresh();
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Erreur");
@@ -126,11 +157,27 @@ export function TemplatesClient({
         }}
       >
         <div className="surface flex flex-col gap-4 p-5">
-          <h2 className="font-medium">Nouveau template</h2>
-          <p className="text-sm text-[var(--fg-muted)]">
-            Ici : image/vidéo, style du texte et 1 ou 2 liens. La campagne
-            n&apos;ajoute ensuite qu&apos;un texte court.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-medium">
+                {editingId ? "Modifier le template" : "Nouveau template"}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--fg-muted)]">
+                Ici : image/vidéo, style du texte et 1 ou 2 liens. La campagne
+                n&apos;ajoute ensuite qu&apos;un texte court.
+              </p>
+            </div>
+            {editingId ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pending}
+                onClick={resetForm}
+              >
+                Annuler
+              </button>
+            ) : null}
+          </div>
 
           <div className="field">
             <label htmlFor="tpl-name">Nom</label>
@@ -273,7 +320,13 @@ export function TemplatesClient({
           </div>
 
           <button className="btn btn-primary self-start" disabled={pending} type="submit">
-            Enregistrer le template
+            {pending
+              ? editingId
+                ? "Mise à jour…"
+                : "Enregistrement…"
+              : editingId
+                ? "Enregistrer les modifications"
+                : "Enregistrer le template"}
           </button>
         </div>
 
@@ -301,8 +354,12 @@ export function TemplatesClient({
       <ul className="flex flex-col gap-3">
         {templates.map((t) => {
           const full = composeTemplateCaption(t.body, t);
+          const isEditing = editingId === t.id;
           return (
-            <li key={t.id} className="surface p-4">
+            <li
+              key={t.id}
+              className={`surface p-4 ${isEditing ? "ring-2 ring-[var(--tvs-blue)]" : ""}`}
+            >
               <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{t.name}</p>
@@ -313,34 +370,45 @@ export function TemplatesClient({
                     </span>
                   )}
                 </div>
-                <ConfirmAlertDialogButton
-                  className="btn btn-danger"
-                  pending={pending}
-                  disabled={pending}
-                  title="Supprimer ce template ?"
-                  description={`« ${t.name} » sera supprimé définitivement. Les campagnes déjà créées ne sont pas affectées.`}
-                  confirmLabel="Supprimer"
-                  variant="destructive"
-                  onConfirm={() =>
-                    startTransition(async () => {
-                      try {
-                        await deleteTemplate({
-                          organizationId,
-                          orgSlug,
-                          templateId: t.id,
-                        });
-                        toast.success("Template supprimé");
-                        router.refresh();
-                      } catch (err) {
-                        toast.error(
-                          err instanceof Error ? err.message : "Erreur",
-                        );
-                      }
-                    })
-                  }
-                >
-                  Supprimer
-                </ConfirmAlertDialogButton>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={pending}
+                    onClick={() => loadTemplate(t)}
+                  >
+                    Modifier
+                  </button>
+                  <ConfirmAlertDialogButton
+                    className="btn btn-danger"
+                    pending={pending}
+                    disabled={pending}
+                    title="Supprimer ce template ?"
+                    description={`« ${t.name} » sera supprimé définitivement. Les campagnes déjà créées ne sont pas affectées.`}
+                    confirmLabel="Supprimer"
+                    variant="destructive"
+                    onConfirm={() =>
+                      startTransition(async () => {
+                        try {
+                          await deleteTemplate({
+                            organizationId,
+                            orgSlug,
+                            templateId: t.id,
+                          });
+                          if (editingId === t.id) resetForm();
+                          toast.success("Template supprimé");
+                          router.refresh();
+                        } catch (err) {
+                          toast.error(
+                            err instanceof Error ? err.message : "Erreur",
+                          );
+                        }
+                      })
+                    }
+                  >
+                    Supprimer
+                  </ConfirmAlertDialogButton>
+                </div>
               </div>
               <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                 <pre className="whitespace-pre-wrap font-sans text-sm text-[var(--fg-muted)]">

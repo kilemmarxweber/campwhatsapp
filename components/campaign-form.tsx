@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
 import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
-import { renderTemplate } from "@/lib/campaigns/render-template";
+import {
+  BASE_CONTACT_VARS,
+  extractTemplateKeys,
+  renderTemplate,
+} from "@/lib/campaigns/render-template";
 import { MessageCardPreview } from "@/components/message-card-preview";
 
 type Contact = {
@@ -37,7 +41,6 @@ type InitialCampaign = {
   mediaId: string | null;
   contactListId: string | null;
   contactIds: string[];
-  /** Best-effort match to a template for edit. */
   templateId?: string;
   note?: string;
 };
@@ -80,17 +83,70 @@ export function CampaignForm({
     return media.find((m) => m.id === selectedTemplate.mediaId) ?? null;
   }, [media, selectedTemplate]);
 
+  /** Variables déjà dans le template choisi (restent au-dessus). */
+  const templateOnlyVariables = useMemo(() => {
+    if (!selectedTemplate) return [];
+    return extractTemplateKeys(selectedTemplate.body);
+  }, [selectedTemplate]);
+
+  /** Variables dans le texte additionnel. */
+  const noteVariables = useMemo(() => extractTemplateKeys(note), [note]);
+
+  /** Toutes les variables du message final. */
+  const allMessageVariables = useMemo(() => {
+    if (!selectedTemplate) return noteVariables;
+    return extractTemplateKeys(
+      composeTemplateCaption(selectedTemplate.body, selectedTemplate, note),
+    );
+  }, [selectedTemplate, note, noteVariables]);
+
+  /** Clés proposées pour insertion dans le texte. */
+  const insertableVariables = useMemo(() => {
+    const fromContacts = new Set<string>();
+    for (const c of contacts) {
+      const custom = c.variables;
+      if (custom && typeof custom === "object" && !Array.isArray(custom)) {
+        for (const key of Object.keys(custom as Record<string, unknown>)) {
+          fromContacts.add(key.toLowerCase());
+        }
+      }
+    }
+    const ordered = new Set<string>([
+      ...BASE_CONTACT_VARS,
+      ...templateOnlyVariables,
+      ...fromContacts,
+    ]);
+    return [...ordered];
+  }, [contacts, templateOnlyVariables]);
+
   const captionPreview = useMemo(() => {
     if (!selectedTemplate) return note;
-    const composed = composeTemplateCaption(selectedTemplate.body, selectedTemplate, note);
+    const composed = composeTemplateCaption(
+      selectedTemplate.body,
+      selectedTemplate,
+      note,
+    );
     const sample = contacts[0];
     if (!sample) return composed;
     return renderTemplate(composed, {
-      name: sample.name ?? "",
-      phone: sample.phone,
+      name: sample.name || "{{name}}",
+      phone: sample.phone || "{{phone}}",
       ...((sample.variables as Record<string, string>) ?? {}),
     });
   }, [selectedTemplate, note, contacts]);
+
+  function insertVariableIntoNote(key: string) {
+    const token = `{{${key}}}`;
+    setNote((prev) => {
+      const sep = !prev.trim()
+        ? ""
+        : prev.endsWith(" ") || prev.endsWith("\n")
+          ? ""
+          : " ";
+      return `${prev}${sep}${token}`;
+    });
+    toast.message(`${token} ajouté au texte`);
+  }
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -157,7 +213,9 @@ export function CampaignForm({
           </div>
 
           <div className="field">
-            <label htmlFor="campaign-template">Template (image + style + liens)</label>
+            <label htmlFor="campaign-template">
+              Template (image + style + liens)
+            </label>
             <select
               id="campaign-template"
               required
@@ -177,15 +235,72 @@ export function CampaignForm({
             </p>
           </div>
 
+          {selectedTemplate ? (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--tvs-blue-soft)]/40 p-3">
+              <p className="mb-1.5 text-xs font-medium tracking-wide text-[var(--fg-muted)] uppercase">
+                Variables du template
+              </p>
+              {templateOnlyVariables.length === 0 ? (
+                <p className="text-xs text-[var(--fg-muted)]">
+                  Ce template n’utilise pas de variable ({`{{name}}`},{" "}
+                  {`{{phone}}`}, …).
+                </p>
+              ) : (
+                <>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {templateOnlyVariables.map((key) => (
+                      <span key={key} className="badge">
+                        {`{{${key}}}`}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-[var(--fg-muted)]">
+                    Remplies automatiquement avec le nom / téléphone (et autres
+                    champs) de chaque contact à l’envoi.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : null}
+
           <div className="field">
-            <label htmlFor="campaign-note">Texte additionnel (optionnel)</label>
+            <label htmlFor="campaign-note">Texte additionnel</label>
             <textarea
               id="campaign-note"
-              rows={3}
+              rows={4}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ex. Offre valable jusqu’au 30 mars — Kinshasa uniquement."
+              placeholder="Ex. Offre valable jusqu’au 30 mars — {{name}}, passez en agence."
             />
+            <div className="mt-2">
+              <p className="mb-1.5 text-xs font-medium tracking-wide text-[var(--fg-muted)] uppercase">
+                Ajouter une variable au texte
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {insertableVariables.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ fontSize: "0.8rem", padding: "0.35rem 0.7rem" }}
+                    onClick={() => insertVariableIntoNote(key)}
+                  >
+                    + {`{{${key}}}`}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
+                Vous pouvez en ajouter une ou plusieurs : elles prendront les
+                valeurs du contact à l’envoi
+                {noteVariables.length > 0
+                  ? ` · dans le texte : ${noteVariables.map((k) => `{{${k}}}`).join(", ")}`
+                  : ""}
+                {allMessageVariables.length > 0
+                  ? ` · message final : ${allMessageVariables.map((k) => `{{${k}}}`).join(", ")}`
+                  : ""}
+                .
+              </p>
+            </div>
           </div>
         </div>
 

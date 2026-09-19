@@ -562,6 +562,84 @@ export async function createTemplate(input: {
   return tpl;
 }
 
+export async function updateTemplate(input: {
+  organizationId: string;
+  orgSlug: string;
+  templateId: string;
+  name: string;
+  body: string;
+  messageType?: "text" | "image" | "video";
+  mediaId?: string | null;
+  link1Label?: string | null;
+  link1Url?: string | null;
+  link2Label?: string | null;
+  link2Url?: string | null;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    templates: ["update"],
+  });
+
+  const existing = await prisma.messageTemplate.findFirst({
+    where: {
+      id: input.templateId,
+      organizationId: input.organizationId,
+    },
+  });
+  if (!existing) throw new Error("Template introuvable");
+
+  const messageType = input.messageType ?? existing.messageType;
+  if (
+    (messageType === "image" || messageType === "video") &&
+    !input.mediaId
+  ) {
+    throw new Error("Un média est requis pour un template image/vidéo");
+  }
+
+  if (input.mediaId) {
+    const media = await prisma.mediaAsset.findFirst({
+      where: { id: input.mediaId, organizationId: input.organizationId },
+    });
+    if (!media) throw new Error("Média introuvable");
+    if (media.kind !== messageType) {
+      throw new Error("Le type de média ne correspond pas au template");
+    }
+  }
+
+  if (!input.name.trim()) {
+    throw new Error("Le nom du template est requis");
+  }
+  if (!input.body.trim()) {
+    throw new Error("Le texte du template est requis");
+  }
+
+  const link1Url = input.link1Url?.trim() || null;
+  const link2Url = input.link2Url?.trim() || null;
+  if (link1Url && !/^https?:\/\//i.test(link1Url)) {
+    throw new Error("Le lien 1 doit commencer par http:// ou https://");
+  }
+  if (link2Url && !/^https?:\/\//i.test(link2Url)) {
+    throw new Error("Le lien 2 doit commencer par http:// ou https://");
+  }
+
+  const tpl = await prisma.messageTemplate.update({
+    where: { id: existing.id },
+    data: {
+      name: input.name.trim(),
+      body: input.body,
+      messageType,
+      mediaId: messageType === "text" ? null : input.mediaId || null,
+      link1Label: link1Url ? input.link1Label?.trim() || "Lien" : null,
+      link1Url,
+      link2Label: link2Url ? input.link2Label?.trim() || "Lien" : null,
+      link2Url,
+    },
+  });
+  revalidatePath(`/o/${input.orgSlug}/templates`);
+  revalidatePath(`/o/${input.orgSlug}/campaigns/new`);
+  revalidatePath(`/o/${input.orgSlug}/campaigns`);
+  return tpl;
+}
+
 export async function deleteTemplate(input: {
   organizationId: string;
   orgSlug: string;

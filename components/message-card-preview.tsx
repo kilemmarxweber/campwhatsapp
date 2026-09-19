@@ -35,13 +35,33 @@ export function applyTextStyle(body: string, style: TextStyle): string {
 
   const lines = trimmed.split("\n");
   const [first, ...rest] = lines;
+  const headline = first.replace(/^\*+|\*+$/g, "").trim();
+
   if (style === "promo") {
-    const headline = first.replace(/^\*+|\*+$/g, "").trim();
-    return [`*${headline.toUpperCase()}*`, ...rest].join("\n").trim();
+    return [
+      `*${uppercasePreservingPlaceholders(headline)}*`,
+      ...rest,
+    ]
+      .join("\n")
+      .trim();
   }
   // offer
-  const headline = first.replace(/^\*+|\*+$/g, "").trim();
   return [`🔥 *${headline}*`, ...rest].join("\n").trim();
+}
+
+/** Majuscules sans toucher aux {{variables}}. */
+function uppercasePreservingPlaceholders(text: string): string {
+  const parts: string[] = [];
+  let last = 0;
+  const re = /\{\{\s*[a-zA-Z0-9_]+\s*\}\}/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    parts.push(text.slice(last, match.index).toUpperCase());
+    parts.push(match[0]);
+    last = match.index + match[0].length;
+  }
+  parts.push(text.slice(last).toUpperCase());
+  return parts.join("");
 }
 
 type MessageCardPreviewProps = {
