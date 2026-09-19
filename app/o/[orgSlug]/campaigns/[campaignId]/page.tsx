@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignActions } from "@/components/campaign-actions";
+import { CampaignLiveRefresh } from "@/components/campaign-live-refresh";
 import { MessageCardPreview } from "@/components/message-card-preview";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 
@@ -45,8 +46,11 @@ export default async function CampaignDetailPage({
     ).length,
   };
 
+  const live = campaign.status === "sending" || stats.pending > 0;
+
   return (
     <div className="flex flex-col gap-6">
+      <CampaignLiveRefresh active={live} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{campaign.name}</h1>

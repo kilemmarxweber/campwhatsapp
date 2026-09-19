@@ -3,7 +3,7 @@ import { getKlamboClient } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { readUploadBuffer } from "@/lib/upload-file.server";
 
-const SEND_DELAY_MS = 200;
+const SEND_DELAY_MS = 14_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -104,7 +104,8 @@ export async function processCampaign(campaignId: string) {
     throw new Error("Média Klambo manquant pour cette campagne");
   }
 
-  for (const recipient of campaign.recipients) {
+  for (let i = 0; i < campaign.recipients.length; i++) {
+    const recipient = campaign.recipients[i]!;
     const live = await prisma.campaign.findUnique({
       where: { id: campaignId },
       select: { status: true },
@@ -161,7 +162,9 @@ export async function processCampaign(campaignId: string) {
       });
     }
 
-    await sleep(SEND_DELAY_MS);
+    if (i < campaign.recipients.length - 1) {
+      await sleep(SEND_DELAY_MS);
+    }
   }
 
   const remaining = await prisma.campaignRecipient.count({
