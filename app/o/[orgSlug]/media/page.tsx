@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { MediaUpload } from "@/components/media-upload";
+import { MediaThumb } from "@/components/media-thumb";
 
 export default async function MediaPage({
   params,
@@ -22,39 +23,30 @@ export default async function MediaPage({
       <div>
         <h1 className="text-2xl font-semibold">Médias</h1>
         <p className="text-[var(--fg-muted)]">
-          Images et vidéos pour les campagnes
+          Stockés dans UPLOAD_DIR (api-uploads), poussés vers Klambo via POST
+          /v1/media
         </p>
       </div>
       <MediaUpload organizationId={org.id} orgSlug={orgSlug} />
-      <div className="surface overflow-hidden">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Fichier</th>
-              <th>Type</th>
-              <th>Taille</th>
-              <th>Klambo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-[var(--fg-muted)]">
-                  Aucun média
-                </td>
-              </tr>
-            ) : (
-              assets.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.filename}</td>
-                  <td>{a.kind}</td>
-                  <td>{(a.size / 1024).toFixed(1)} Ko</td>
-                  <td>{a.klamboMediaId ? "uploadé" : "local"}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {assets.length === 0 ? (
+          <p className="text-[var(--fg-muted)]">Aucun média</p>
+        ) : (
+          assets.map((a) => (
+            <div key={a.id} className="surface overflow-hidden p-3">
+              <MediaThumb
+                storagePath={a.storagePath}
+                kind={a.kind}
+                filename={a.filename}
+              />
+              <p className="mt-2 truncate text-sm font-medium">{a.filename}</p>
+              <p className="text-xs text-[var(--fg-muted)]">
+                {a.kind} · {(a.size / 1024).toFixed(1)} Ko ·{" "}
+                {a.klamboMediaId ? "sur Klambo" : "local seulement"}
+              </p>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

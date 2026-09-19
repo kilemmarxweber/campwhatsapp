@@ -3,14 +3,25 @@ import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignForm } from "@/components/campaign-form";
 
-export default async function NewCampaignPage({
+export default async function EditCampaignPage({
   params,
 }: {
-  params: Promise<{ orgSlug: string }>;
+  params: Promise<{ orgSlug: string; campaignId: string }>;
 }) {
-  const { orgSlug } = await params;
+  const { orgSlug, campaignId } = await params;
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
+
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: campaignId, organizationId: org.id },
+    include: {
+      recipients: { select: { contactId: true } },
+    },
+  });
+  if (!campaign) notFound();
+  if (campaign.status === "sending") {
+    notFound();
+  }
 
   const [contacts, media, lists, templates] = await Promise.all([
     prisma.contact.findMany({
@@ -43,10 +54,8 @@ export default async function NewCampaignPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Nouvelle campagne</h1>
-        <p className="text-[var(--fg-muted)]">
-          Message dynamique + audience + envoi Klambo
-        </p>
+        <h1 className="text-2xl font-semibold">Modifier la campagne</h1>
+        <p className="text-[var(--fg-muted)]">{campaign.name}</p>
       </div>
       <CampaignForm
         organizationId={org.id}
@@ -55,6 +64,15 @@ export default async function NewCampaignPage({
         media={media}
         lists={lists}
         templates={templates}
+        initial={{
+          id: campaign.id,
+          name: campaign.name,
+          bodyTemplate: campaign.bodyTemplate,
+          messageType: campaign.messageType,
+          mediaId: campaign.mediaId,
+          contactListId: campaign.contactListId,
+          contactIds: campaign.recipients.map((r) => r.contactId),
+        }}
       />
     </div>
   );

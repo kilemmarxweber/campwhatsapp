@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignActions } from "@/components/campaign-actions";
+import { MediaThumb } from "@/components/media-thumb";
 
 export default async function CampaignDetailPage({
   params,
@@ -41,7 +42,8 @@ export default async function CampaignDetailPage({
         <div>
           <h1 className="text-2xl font-semibold">{campaign.name}</h1>
           <p className="text-[var(--fg-muted)]">
-            {campaign.messageType} · <span className="badge">{campaign.status}</span>
+            {campaign.messageType} ·{" "}
+            <span className="badge">{campaign.status}</span>
           </p>
         </div>
         <CampaignActions
@@ -67,15 +69,29 @@ export default async function CampaignDetailPage({
         ))}
       </div>
 
-      <div className="surface p-5">
-        <p className="mb-2 text-sm text-[var(--fg-muted)]">Template</p>
-        <pre className="whitespace-pre-wrap font-sans text-sm">
-          {campaign.bodyTemplate}
-        </pre>
-        {campaign.media && (
-          <p className="mt-3 text-sm text-[var(--fg-muted)]">
-            Média : {campaign.media.filename}
+      <div className="surface grid gap-4 p-5 md:grid-cols-2">
+        <div>
+          <p className="mb-2 text-sm text-[var(--fg-muted)]">
+            Message / légende
           </p>
+          <pre className="whitespace-pre-wrap font-sans text-sm">
+            {campaign.bodyTemplate}
+          </pre>
+        </div>
+        {campaign.media ? (
+          <div>
+            <p className="mb-2 text-sm text-[var(--fg-muted)]">
+              Média · {campaign.media.filename}
+              {campaign.media.klamboMediaId ? " · Klambo OK" : ""}
+            </p>
+            <MediaThumb
+              storagePath={campaign.media.storagePath}
+              kind={campaign.media.kind}
+              filename={campaign.media.filename}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--fg-muted)]">Pas de média</p>
         )}
       </div>
 

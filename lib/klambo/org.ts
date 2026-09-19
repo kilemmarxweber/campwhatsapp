@@ -23,7 +23,17 @@ export async function getKlamboClient() {
       "Clé API Klambo non configurée. Allez dans Siège → WhatsApp.",
     );
   }
-  const apiKey = decryptSecret(settings.apiKeyEnc);
+  let apiKey: string;
+  try {
+    apiKey = decryptSecret(settings.apiKeyEnc);
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? err.message
+        : "Clé API Klambo illisible. Ré-enregistrez-la dans Siège → WhatsApp.",
+      { cause: err },
+    );
+  }
   return {
     client: new KlamboClient(apiKey, settings.baseUrl),
     settings,

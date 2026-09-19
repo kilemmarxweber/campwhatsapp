@@ -18,6 +18,7 @@ export type KlamboSendResponse = {
   to: string;
   provider_message_id?: string;
   created_at?: string;
+  error?: string | null;
 };
 
 export type KlamboMediaUploadResponse = {
@@ -39,20 +40,19 @@ export class KlamboClient {
     return `${this.baseUrl.replace(/\/$/, "")}${path}`;
   }
 
-  private async request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<T> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${this.apiKey}`);
+    // Ne pas forcer Content-Type sur FormData (boundary multipart).
+    if (!(init.body instanceof FormData) && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
     const res = await fetch(this.url(path), {
       ...init,
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        ...(init.body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...(init.headers ?? {}),
-      },
+      headers,
     });
+
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`Klambo ${res.status}: ${text || res.statusText}`);
@@ -60,19 +60,44 @@ export class KlamboClient {
     return res.json() as Promise<T>;
   }
 
-  send(payload: KlamboSendPayload) {
-    return this.request<KlamboSendResponse>("/v1/send", {
+  async getMessage(id: string) {
+    return this.request<KlamboSendResponse>(`/v1/messages/${id}`);
+  }
+
+  async send(payload: KlamboSendPayload) {
+    const result = await this.request<KlamboSendResponse>("/v1/send", {
       method: "POST",
       body: JSON.stringify({
         channel: "whatsapp",
         ...payload,
       }),
     });
+
+    // L'API Klambo répond HTTP 200 même si GOWA a échoué (status: failed).
+    if (result.status === "failed") {
+      let detail = result.error ?? null;
+      try {
+        const full = await this.getMessage(result.id);
+        detail = full.error ?? detail;
+      } catch {
+        // ignore
+      }
+      throw new Error(
+        detail
+          ? `Klambo failed: ${detail}`
+          : `Klambo failed (message ${result.id})`,
+      );
+    }
+
+    return result;
   }
 
-  async uploadMedia(file: Blob, filename: string) {
+  async uploadMedia(bytes: Buffer | Uint8Array, filename: string, mimeType: string) {
     const form = new FormData();
+    const file = new File([bytes as BlobPart], filename, { type: mimeType });
     form.append("file", file, filename);
+    form.append("filename", filename);
+
     return this.request<KlamboMediaUploadResponse>("/v1/media", {
       method: "POST",
       body: form,

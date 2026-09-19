@@ -2,6 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
+import { CampaignRowActions } from "@/components/campaign-row-actions";
+import {
+  getPageSize,
+  parsePageParam,
+  TablePagination,
+} from "@/components/table-pagination";
 
 function statusBadge(status: string) {
   if (status === "completed" || status === "sent") return "badge badge-ok";
@@ -12,19 +18,32 @@ function statusBadge(status: string) {
 
 export default async function CampaignsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { orgSlug } = await params;
+  const { page: pageRaw } = await searchParams;
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
 
+  const pageSize = getPageSize();
+  const page = parsePageParam(pageRaw);
+  const where = { organizationId: org.id };
+
+  const totalItems = await prisma.campaign.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
   const campaigns = await prisma.campaign.findMany({
-    where: { organizationId: org.id },
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { recipients: true } },
     },
+    skip: (currentPage - 1) * pageSize,
+    take: pageSize,
   });
 
   return (
@@ -48,12 +67,13 @@ export default async function CampaignsPage({
               <th>Statut</th>
               <th>Destinataires</th>
               <th>Créée</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {campaigns.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-[var(--fg-muted)]">
+                <td colSpan={6} className="text-[var(--fg-muted)]">
                   Aucune campagne
                 </td>
               </tr>
@@ -63,7 +83,7 @@ export default async function CampaignsPage({
                   <td>
                     <Link
                       href={`/o/${orgSlug}/campaigns/${c.id}`}
-                      className="text-[var(--accent)]"
+                      className="font-medium text-[var(--tvs-blue)] hover:underline"
                     >
                       {c.name}
                     </Link>
@@ -76,11 +96,26 @@ export default async function CampaignsPage({
                   <td className="text-sm text-[var(--fg-muted)]">
                     {c.createdAt.toLocaleString("fr-FR")}
                   </td>
+                  <td>
+                    <CampaignRowActions
+                      organizationId={org.id}
+                      orgSlug={orgSlug}
+                      campaignId={c.id}
+                      status={c.status}
+                    />
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+
+        <TablePagination
+          basePath={`/o/${orgSlug}/campaigns`}
+          page={currentPage}
+          totalItems={totalItems}
+          label="campagnes"
+        />
       </div>
     </div>
   );

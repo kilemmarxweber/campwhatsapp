@@ -117,7 +117,7 @@ export default async function OrgHomePage({
                     <td>
                       <Link
                         href={`/o/${orgSlug}/campaigns/${c.id}`}
-                        className="text-[var(--accent)]"
+                        className="font-medium text-[var(--tvs-blue)] hover:underline"
                       >
                         {c.name}
                       </Link>

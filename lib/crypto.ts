@@ -1,11 +1,29 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
-function getKey(): Buffer {
-  const secret =
-    process.env.ENCRYPTION_SECRET ??
-    process.env.BETTER_AUTH_SECRET ??
-    "dev-insecure-secret-change-me";
+function keyFromSecret(secret: string): Buffer {
   return createHash("sha256").update(secret).digest();
+}
+
+/** Prefer ENCRYPTION_SECRET; keep BETTER_AUTH_SECRET for older ciphertext. */
+function encryptionKeyCandidates(): Buffer[] {
+  const secrets = [
+    process.env.ENCRYPTION_SECRET,
+    process.env.BETTER_AUTH_SECRET,
+    "dev-insecure-secret-change-me",
+  ].filter((s): s is string => Boolean(s?.trim()));
+
+  const seen = new Set<string>();
+  const keys: Buffer[] = [];
+  for (const secret of secrets) {
+    if (seen.has(secret)) continue;
+    seen.add(secret);
+    keys.push(keyFromSecret(secret));
+  }
+  return keys;
+}
+
+function getKey(): Buffer {
+  return encryptionKeyCandidates()[0]!;
 }
 
 /** Chiffre une API key Klambo (AES-256-GCM). */
@@ -22,17 +40,28 @@ export function decryptSecret(payload: string): string {
   if (version !== "v1" || !ivB64 || !tagB64 || !dataB64) {
     throw new Error("Payload chiffré invalide");
   }
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
-    getKey(),
-    Buffer.from(ivB64, "base64"),
+
+  const iv = Buffer.from(ivB64, "base64");
+  const tag = Buffer.from(tagB64, "base64");
+  const data = Buffer.from(dataB64, "base64");
+  let lastError: unknown;
+
+  for (const key of encryptionKeyCandidates()) {
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(tag);
+      const dec = Buffer.concat([decipher.update(data), decipher.final()]);
+      return dec.toString("utf8");
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw new Error(
+    "Impossible de déchiffrer le secret (ENCRYPTION_SECRET modifié ?). " +
+      "Ré-enregistrez la clé API dans Siège → WhatsApp.",
+    { cause: lastError },
   );
-  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
-  const dec = Buffer.concat([
-    decipher.update(Buffer.from(dataB64, "base64")),
-    decipher.final(),
-  ]);
-  return dec.toString("utf8");
 }
 
 export function maskApiKey(key: string): string {

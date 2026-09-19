@@ -1,8 +1,7 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import prisma from "@/lib/prisma";
 import { getKlamboClient } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
+import { readUploadBuffer } from "@/lib/upload-file.server";
 
 const SEND_DELAY_MS = 200;
 
@@ -59,20 +58,40 @@ export async function processCampaign(campaignId: string) {
 
   if (
     (campaign.messageType === "image" || campaign.messageType === "video") &&
-    campaign.media &&
-    !klamboMediaId
+    campaign.media
   ) {
-    const absolute = path.isAbsolute(campaign.media.storagePath)
-      ? campaign.media.storagePath
-      : path.join(process.cwd(), campaign.media.storagePath);
-    const buf = await readFile(absolute);
-    const blob = new Blob([buf], { type: campaign.media.mimeType });
-    const uploaded = await client.uploadMedia(blob, campaign.media.filename);
+    const buf = await readUploadBuffer(campaign.media.storagePath);
+
+    // Fichiers seed trop petits → GOWA/WhatsApp rejette souvent.
+    if (campaign.messageType === "image" && buf.byteLength < 2_000) {
+      throw new Error(
+        `Image trop petite (${buf.byteLength} o). Uploadez une vraie photo JPEG/PNG (max 5 Mo).`,
+      );
+    }
+    if (campaign.messageType === "video" && buf.byteLength < 10_000) {
+      throw new Error(
+        `Vidéo trop petite (${buf.byteLength} o). Uploadez un vrai fichier MP4 (max 16 Mo).`,
+      );
+    }
+
+    // Toujours re-pousser vers Klambo pour que l'API ait le fichier dans son UPLOAD_DIR.
+    const uploaded = await client.uploadMedia(
+      buf,
+      campaign.media.filename,
+      campaign.media.mimeType,
+    );
     klamboMediaId = uploaded.id;
     await prisma.mediaAsset.update({
       where: { id: campaign.media.id },
       data: { klamboMediaId },
     });
+  }
+
+  if (
+    (campaign.messageType === "image" || campaign.messageType === "video") &&
+    !klamboMediaId
+  ) {
+    throw new Error("Média Klambo manquant pour cette campagne");
   }
 
   for (const recipient of campaign.recipients) {

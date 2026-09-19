@@ -30,7 +30,7 @@
 # prisma
 /prisma/generated
 
-# uploads (keep folder)
+# uploads locaux (dossier projet legacy)
 /uploads/*
 !/uploads/.gitkeep
 

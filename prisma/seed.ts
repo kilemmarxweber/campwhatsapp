@@ -4,12 +4,11 @@
  * Org    : tvs-rdc
  */
 import "dotenv/config";
-import { createHash, randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { randomUUID } from "crypto";
 import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
+import { writeOrgUpload } from "../lib/upload-file.server";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
@@ -170,20 +169,22 @@ async function seedContacts(organizationId: string) {
 }
 
 async function seedMedia(organizationId: string) {
-  const dir = path.join(process.cwd(), "uploads", organizationId);
-  await mkdir(dir, { recursive: true });
-
   const imageBuf = tinyJpeg();
   const imageName = "tvs-promo-hlx.jpg";
-  const imageRel = path.join("uploads", organizationId, imageName);
-  await writeFile(path.join(process.cwd(), imageRel), imageBuf);
-
   const videoBuf = tinyMp4Stub();
   const videoName = "tvs-promo-king.mp4";
-  const videoRel = path.join("uploads", organizationId, videoName);
-  await writeFile(path.join(process.cwd(), videoRel), videoBuf);
 
-  // Idempotent : wipe seed media for this org then recreate
+  const imageSaved = await writeOrgUpload({
+    organizationId,
+    filename: imageName,
+    buffer: imageBuf,
+  });
+  const videoSaved = await writeOrgUpload({
+    organizationId,
+    filename: videoName,
+    buffer: videoBuf,
+  });
+
   await prisma.mediaAsset.deleteMany({
     where: {
       organizationId,
@@ -198,7 +199,7 @@ async function seedMedia(organizationId: string) {
       mimeType: "image/jpeg",
       size: imageBuf.byteLength,
       kind: "image",
-      storagePath: imageRel.replace(/\\/g, "/"),
+      storagePath: imageSaved.relativePath,
     },
   });
 
@@ -209,19 +210,26 @@ async function seedMedia(organizationId: string) {
       mimeType: "video/mp4",
       size: videoBuf.byteLength,
       kind: "video",
-      storagePath: videoRel.replace(/\\/g, "/"),
+      storagePath: videoSaved.relativePath,
     },
   });
 
-  console.log(`✓ Médias : ${image.filename}, ${video.filename}`);
+  console.log(
+    `✓ Médias dans UPLOAD_DIR : ${imageSaved.absolutePath}, ${videoSaved.absolutePath}`,
+  );
   return { image, video };
 }
 
-async function seedTemplates(organizationId: string) {
+async function seedTemplates(
+  organizationId: string,
+  media: Awaited<ReturnType<typeof seedMedia>>,
+) {
   await prisma.messageTemplate.deleteMany({
     where: {
       organizationId,
-      name: { in: ["Promo HLX", "Crédit moto", "Promo King Kargo"] },
+      name: {
+        in: ["Promo HLX", "Crédit moto", "Promo King Kargo", "Teaser vidéo"],
+      },
     },
   });
 
@@ -230,25 +238,38 @@ async function seedTemplates(organizationId: string) {
       data: {
         organizationId,
         name: "Promo HLX",
+        messageType: "text",
         body: "Bonjour {{name}} ! Offre TVS Motors à {{ville}} : le {{modele}} vous attend. Passez en agence 🛵",
       },
     }),
     prisma.messageTemplate.create({
       data: {
         organizationId,
-        name: "Crédit moto",
-        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos : info@tvsrdcongo.com",
+        name: "Promo King Kargo",
+        messageType: "image",
+        mediaId: media.image.id,
+        body: "{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
       },
     }),
     prisma.messageTemplate.create({
       data: {
         organizationId,
-        name: "Promo King Kargo",
-        body: "{{name}}, découvrez le KING KARGO multifonctions. Disponible à {{ville}} — TVS R.D. Congo.",
+        name: "Teaser vidéo",
+        messageType: "video",
+        mediaId: media.video.id,
+        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos agence {{ville}}.",
+      },
+    }),
+    prisma.messageTemplate.create({
+      data: {
+        organizationId,
+        name: "Crédit moto",
+        messageType: "text",
+        body: "Salut {{name}}, avec le crédit moto TVS ne rêvez plus — vivez l'aventure. Infos : info@tvsrdcongo.com",
       },
     }),
   ]);
-  console.log(`✓ ${templates.length} templates`);
+  console.log(`✓ ${templates.length} templates (texte / image / vidéo)`);
   return templates;
 }
 
@@ -360,23 +381,17 @@ async function seedCampaigns(
     data: {
       organizationId,
       name: seedNames[2]!,
-      status: "completed",
+      status: "draft",
       messageType: "video",
       bodyTemplate: videoCaption,
       mediaId: media.video.id,
-      startedAt: new Date(Date.now() - 3600_000),
-      completedAt: new Date(Date.now() - 3000_000),
+      // Destinataires prêts, mais ne pas marquer sent : le stub MP4 seed
+      // est rejeté par WhatsApp. Uploadez un vrai MP4 avant envoi.
       recipients: {
-        create: audience.slice(0, 2).map((c, i) => ({
+        create: audience.slice(0, 2).map((c) => ({
           contactId: c.id,
           renderedBody: renderBody(videoCaption, c),
-          status: i === 0 ? "sent" : "failed",
-          sentAt: i === 0 ? new Date(Date.now() - 3300_000) : null,
-          error: i === 1 ? "Exemple seed : échec simulé" : null,
-          klamboMessageId:
-            i === 0
-              ? `seed_${createHash("sha256").update(c.id).digest("hex").slice(0, 16)}`
-              : null,
+          status: "pending",
         })),
       },
     },
@@ -385,7 +400,9 @@ async function seedCampaigns(
   console.log("✓ Campagnes :");
   console.log(`  - ${textCampaign.name} (text / draft / ${audience.length} dest.)`);
   console.log(`  - ${imageCampaign.name} (image / draft / 3 dest.)`);
-  console.log(`  - ${videoCampaign.name} (video / completed / 2 dest.)`);
+  console.log(
+    `  - ${videoCampaign.name} (video / draft / 2 dest. — stub, remplacer le MP4 avant envoi)`,
+  );
 }
 
 async function main() {
@@ -394,7 +411,7 @@ async function main() {
   const org = await ensureOrg(user.id);
   const contacts = await seedContacts(org.id);
   const media = await seedMedia(org.id);
-  await seedTemplates(org.id);
+  await seedTemplates(org.id, media);
   const list = await seedLists(
     org.id,
     contacts.map((c) => c.id),

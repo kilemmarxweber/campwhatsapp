@@ -250,7 +250,7 @@ enum MediaKind {
 }
 
 model MediaAsset {
-  id             String       @id @default(cuid())
+  id             String            @id @default(cuid())
   organizationId String
   filename       String
   mimeType       String
@@ -258,22 +258,26 @@ model MediaAsset {
   kind           MediaKind
   storagePath    String
   klamboMediaId  String?
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaigns      Campaign[]
+  templates      MessageTemplate[]
 
   @@index([organizationId])
   @@map("media_asset")
 }
 
 model MessageTemplate {
-  id             String       @id @default(cuid())
+  id             String              @id @default(cuid())
   organizationId String
   name           String
   body           String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messageType    CampaignMessageType @default(text)
+  mediaId        String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  media          MediaAsset?         @relation(fields: [mediaId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@map("message_template")
