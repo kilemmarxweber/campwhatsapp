@@ -10,6 +10,8 @@ import {
   deleteContactList,
   importContactsFromExcel,
 } from "@/lib/contacts/actions";
+import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
+import { TablePagination } from "@/components/table-pagination";
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -25,6 +27,8 @@ export function ContactsClient({
   orgSlug,
   contacts,
   lists,
+  page,
+  totalContacts,
 }: {
   organizationId: string;
   orgSlug: string;
@@ -39,6 +43,8 @@ export function ContactsClient({
     name: string;
     _count: { members: number };
   }[];
+  page: number;
+  totalContacts: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -205,11 +211,15 @@ export function ContactsClient({
                     {list._count.members === 1 ? "" : "s"}
                   </p>
                 </div>
-                <button
-                  type="button"
+                <ConfirmAlertDialogButton
                   className="btn btn-danger"
+                  pending={pending}
                   disabled={pending}
-                  onClick={() => {
+                  title="Supprimer cette liste ?"
+                  description={`« ${list.name} » sera supprimée. Les contacts ne seront pas effacés.`}
+                  confirmLabel="Supprimer"
+                  variant="destructive"
+                  onConfirm={() =>
                     startTransition(async () => {
                       try {
                         await deleteContactList({
@@ -224,77 +234,92 @@ export function ContactsClient({
                           err instanceof Error ? err.message : "Erreur",
                         );
                       }
-                    });
-                  }}
+                    })
+                  }
                 >
                   Supprimer
-                </button>
+                </ConfirmAlertDialogButton>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <div className="surface overflow-hidden">
-        {contacts.length === 0 ? (
+      <div className="surface overflow-x-auto">
+        {contacts.length === 0 && totalContacts === 0 ? (
           <div className="p-8 text-center text-[var(--fg-muted)]">
             Aucun contact — ajoutez-en un ou importez un Excel pour démarrer.
           </div>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th className="w-10" />
-                <th>Nom</th>
-                <th>Téléphone</th>
-                <th>Email</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(c.id)}
-                      onChange={() => toggleSelect(c.id)}
-                      aria-label={`Sélectionner ${c.name || c.phone}`}
-                    />
-                  </td>
-                  <td>{c.name || "—"}</td>
-                  <td className="font-mono text-sm">{c.phone}</td>
-                  <td>{c.email || "—"}</td>
-                  <td className="text-right">
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      disabled={pending}
-                      onClick={() => {
-                        startTransition(async () => {
-                          try {
-                            await deleteContact({
-                              organizationId,
-                              orgSlug,
-                              contactId: c.id,
-                            });
-                            toast.success("Contact supprimé");
-                            router.refresh();
-                          } catch (err) {
-                            toast.error(
-                              err instanceof Error ? err.message : "Erreur",
-                            );
-                          }
-                        });
-                      }}
-                    >
-                      Supprimer
-                    </button>
-                  </td>
+          <>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className="w-10" />
+                  <th>Nom</th>
+                  <th>Téléphone</th>
+                  <th>Email</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {contacts.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(c.id)}
+                        onChange={() => toggleSelect(c.id)}
+                        aria-label={`Sélectionner ${c.name || c.phone}`}
+                      />
+                    </td>
+                    <td>{c.name || "—"}</td>
+                    <td className="font-mono text-sm">{c.phone}</td>
+                    <td>{c.email || "—"}</td>
+                    <td className="text-right">
+                      <ConfirmAlertDialogButton
+                        className="btn btn-danger"
+                        pending={pending}
+                        disabled={pending}
+                        title="Supprimer ce contact ?"
+                        description={`${c.name || c.phone} sera retiré définitivement de la base destinataires.`}
+                        confirmLabel="Supprimer"
+                        variant="destructive"
+                        onConfirm={() =>
+                          startTransition(async () => {
+                            try {
+                              await deleteContact({
+                                organizationId,
+                                orgSlug,
+                                contactId: c.id,
+                              });
+                              toast.success("Contact supprimé");
+                              setSelected((prev) =>
+                                prev.filter((id) => id !== c.id),
+                              );
+                              router.refresh();
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error ? err.message : "Erreur",
+                              );
+                            }
+                          })
+                        }
+                      >
+                        Supprimer
+                      </ConfirmAlertDialogButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <TablePagination
+              basePath={`/o/${orgSlug}/contacts`}
+              page={page}
+              totalItems={totalContacts}
+              label="contacts"
+            />
+          </>
         )}
       </div>
     </div>

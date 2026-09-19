@@ -9,6 +9,7 @@ import {
   removeMember,
   updateMemberRole,
 } from "@/lib/succursales/actions";
+import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 
 type MemberRow = {
   id: string;
@@ -154,11 +155,15 @@ export function EquipeClient({
                 </td>
                 {canManage ? (
                   <td className="text-right">
-                    <button
-                      type="button"
+                    <ConfirmAlertDialogButton
                       className="btn btn-danger"
+                      pending={pending}
                       disabled={pending}
-                      onClick={() => {
+                      title="Retirer ce membre ?"
+                      description={`${m.user.name || m.user.email} n’aura plus accès à cette succursale.`}
+                      confirmLabel="Retirer"
+                      variant="destructive"
+                      onConfirm={() =>
                         startTransition(async () => {
                           try {
                             await removeMember({
@@ -173,11 +178,11 @@ export function EquipeClient({
                               err instanceof Error ? err.message : "Erreur",
                             );
                           }
-                        });
-                      }}
+                        })
+                      }
                     >
                       Retirer
-                    </button>
+                    </ConfirmAlertDialogButton>
                   </td>
                 ) : null}
               </tr>

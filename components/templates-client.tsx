@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createTemplate, deleteTemplate } from "@/lib/campaigns/actions";
 import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
+import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { MediaThumb } from "@/components/media-thumb";
 import {
   APP_LINKS,
@@ -312,22 +313,34 @@ export function TemplatesClient({
                     </span>
                   )}
                 </div>
-                <button
-                  type="button"
+                <ConfirmAlertDialogButton
                   className="btn btn-danger"
-                  onClick={() =>
+                  pending={pending}
+                  disabled={pending}
+                  title="Supprimer ce template ?"
+                  description={`« ${t.name} » sera supprimé définitivement. Les campagnes déjà créées ne sont pas affectées.`}
+                  confirmLabel="Supprimer"
+                  variant="destructive"
+                  onConfirm={() =>
                     startTransition(async () => {
-                      await deleteTemplate({
-                        organizationId,
-                        orgSlug,
-                        templateId: t.id,
-                      });
-                      router.refresh();
+                      try {
+                        await deleteTemplate({
+                          organizationId,
+                          orgSlug,
+                          templateId: t.id,
+                        });
+                        toast.success("Template supprimé");
+                        router.refresh();
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error ? err.message : "Erreur",
+                        );
+                      }
                     })
                   }
                 >
                   Supprimer
-                </button>
+                </ConfirmAlertDialogButton>
               </div>
               <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                 <pre className="whitespace-pre-wrap font-sans text-sm text-[var(--fg-muted)]">
