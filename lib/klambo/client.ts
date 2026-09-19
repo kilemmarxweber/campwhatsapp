@@ -104,6 +104,18 @@ export class KlamboClient {
     });
   }
 
+  /** Fichier déjà sous le UPLOAD_DIR partagé de l'API. */
+  registerMedia(input: {
+    relative_path: string;
+    mime_type: string;
+    filename?: string;
+  }) {
+    return this.request<KlamboMediaUploadResponse>("/v1/media/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
   registerWebhook(url: string, events: string[]) {
     return this.request<{ id: string; secret: string }>("/v1/webhooks", {
       method: "POST",

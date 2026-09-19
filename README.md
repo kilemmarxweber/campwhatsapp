@@ -7,43 +7,63 @@ App multi-succursales pour créer et envoyer des campagnes WhatsApp (texte, imag
 - Next.js 16.3 + React 19
 - Prisma 7.10 + PostgreSQL
 - Better Auth (succursales = organizations, rôles siège)
-- Klambo API (`POST /v1/send`, `POST /v1/media`, webhooks)
+- Klambo API (`POST /v1/send`, `POST /v1/media`, `POST /v1/media/register`, webhooks)
+
+## Médias (option A + register)
+
+```
+TVS UPLOAD_DIR (C:/api-uploads/{orgId}/…)
+   → aperçu /api/uploads/…
+   → POST /v1/media/register (si même UPLOAD_DIR que l’API)
+   → sinon POST /v1/media (copie multipart)
+   → POST /v1/send { media: { id }, caption }
+```
+
+```env
+UPLOAD_DIR=C:/api-uploads
+#UPLOAD_DIR=/var/www/api-uploads
+```
+
+Aligner l’API Klambo :
+
+```env
+# apps/api/.env
+UPLOAD_DIR=C:/api-uploads
+```
 
 ## Démarrage
 
 1. Copier `.env.example` → `.env` et renseigner `DATABASE_URL` + `ENCRYPTION_SECRET`
-2. Créer la base Postgres
+2. Créer la base Postgres + dossier `C:\api-uploads`
 3. Installer et migrer :
 
 ```bash
 pnpm install
 pnpm prisma generate
 pnpm prisma migrate dev
+pnpm db:seed   # optionnel
 pnpm dev
 ```
 
-4. Ouvrir http://localhost:3000 → s'inscrire (compte siège : rôle `admin`) → **Siège** → créer une succursale
-5. Configurer la clé Klambo dans **Siège → WhatsApp** (partagée par toutes les succursales)
+4. Ouvrir http://localhost:3000 → s'inscrire → **Siège** → succursale
+5. **Siège → WhatsApp** : clé Klambo
+6. **Médias** : uploader JPEG/PNG/MP4 réels → campagne image/vidéo
 
 ## Fonctionnalités
 
 - Succursales isolées (contacts, campagnes, médias)
-- Clé WhatsApp / Klambo unique au **siège**
-- Rôles & permissions définis au **siège**, répercutés partout
-- Équipe / invitations par succursale
-- Contacts CRUD + listes + import Excel
-- Templates `{{name}}`, `{{phone}}`, …
-- Campagnes texte / image / vidéo + relance des échecs
-- Webhook statut : `POST /api/webhooks/klambo`
+- Clé WhatsApp / Klambo au siège
+- Contacts + import Excel
+- Templates texte / image / vidéo
+- Campagnes + preview média + relance échecs
+- Webhook : `POST /api/webhooks/klambo`
 
 ## Excel
 
-Colonnes reconnues : `phone` / `telephone` / `tel`, `name` / `nom`, `email`. Toute autre colonne devient une variable de template.
+Colonnes : `phone` / `telephone` / `tel`, `name` / `nom`, `email` + variables libres.
 
 ## Klambo
 
 - Console : https://whatsapp.klambocore.com/
-- Base URL API : `https://whatsapp-api.klambocore.com`
-- Configuration : **Siège → WhatsApp** (clé chiffrée en base)
-- Optionnel dans `.env` : `KLAMBO_BASE_URL`, `KLAMBO_DEFAULT_COUNTRY` (préremplissage UI)
-- Events webhook : `message.sent`, `message.delivered`, `message.read`, `message.failed`
+- API : `https://whatsapp-api.klambocore.com` (ou `http://localhost:3005`)
+- Journal API : aperçu image/vidéo + erreurs GOWA

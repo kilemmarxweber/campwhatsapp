@@ -389,14 +389,22 @@ export async function uploadMediaAsset(input: {
   let klamboMediaId: string | null = null;
   try {
     const { client } = await getKlamboClient();
-    const uploaded = await client.uploadMedia(
-      buf,
-      input.filename,
-      input.mimeType,
-    );
-    klamboMediaId = uploaded.id;
+    try {
+      const registered = await client.registerMedia({
+        relative_path: relativePath.replace(/\\/g, "/"),
+        mime_type: input.mimeType,
+        filename: input.filename,
+      });
+      klamboMediaId = registered.id;
+    } catch {
+      const uploaded = await client.uploadMedia(
+        buf,
+        input.filename,
+        input.mimeType,
+      );
+      klamboMediaId = uploaded.id;
+    }
   } catch (err) {
-    // Clé absente ou API down : on garde le fichier local, upload Klambo à l'envoi.
     console.warn(
       "[uploadMediaAsset] push Klambo différé:",
       err instanceof Error ? err.message : err,

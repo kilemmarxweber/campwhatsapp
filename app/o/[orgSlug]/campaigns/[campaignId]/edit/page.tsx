@@ -32,7 +32,7 @@ export default async function EditCampaignPage({
     prisma.mediaAsset.findMany({
       where: { organizationId: org.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, filename: true, kind: true },
+      select: { id: true, filename: true, kind: true, storagePath: true },
     }),
     prisma.contactList.findMany({
       where: { organizationId: org.id },

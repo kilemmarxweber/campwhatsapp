@@ -62,7 +62,6 @@ export async function processCampaign(campaignId: string) {
   ) {
     const buf = await readUploadBuffer(campaign.media.storagePath);
 
-    // Fichiers seed trop petits → GOWA/WhatsApp rejette souvent.
     if (campaign.messageType === "image" && buf.byteLength < 2_000) {
       throw new Error(
         `Image trop petite (${buf.byteLength} o). Uploadez une vraie photo JPEG/PNG (max 5 Mo).`,
@@ -74,13 +73,24 @@ export async function processCampaign(campaignId: string) {
       );
     }
 
-    // Toujours re-pousser vers Klambo pour que l'API ait le fichier dans son UPLOAD_DIR.
-    const uploaded = await client.uploadMedia(
-      buf,
-      campaign.media.filename,
-      campaign.media.mimeType,
-    );
-    klamboMediaId = uploaded.id;
+    // 1) Si UPLOAD_DIR partagé : register sans re-copie
+    // 2) Sinon : multipart POST /v1/media (option A)
+    try {
+      const registered = await client.registerMedia({
+        relative_path: campaign.media.storagePath.replace(/\\/g, "/"),
+        mime_type: campaign.media.mimeType,
+        filename: campaign.media.filename,
+      });
+      klamboMediaId = registered.id;
+    } catch {
+      const uploaded = await client.uploadMedia(
+        buf,
+        campaign.media.filename,
+        campaign.media.mimeType,
+      );
+      klamboMediaId = uploaded.id;
+    }
+
     await prisma.mediaAsset.update({
       where: { id: campaign.media.id },
       data: { klamboMediaId },

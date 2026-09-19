@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
 import { renderTemplate } from "@/lib/campaigns/render-template";
+import { MediaThumb } from "@/components/media-thumb";
 
 type Contact = {
   id: string;
@@ -13,7 +14,7 @@ type Contact = {
   variables: unknown;
 };
 
-type Media = { id: string; filename: string; kind: string };
+type Media = { id: string; filename: string; kind: string; storagePath?: string };
 type List = { id: string; name: string; _count: { members: number } };
 type Template = {
   id: string;
@@ -218,6 +219,20 @@ export function CampaignForm({
               : ""}
           </p>
           <p className="whitespace-pre-wrap text-[var(--fg)]">{preview}</p>
+          {mediaId &&
+            (() => {
+              const m = media.find((x) => x.id === mediaId);
+              if (!m?.storagePath) return null;
+              return (
+                <div className="mt-3 max-w-sm">
+                  <MediaThumb
+                    storagePath={m.storagePath}
+                    kind={m.kind}
+                    filename={m.filename}
+                  />
+                </div>
+              );
+            })()}
         </div>
       </div>
 
