@@ -76,7 +76,7 @@ export function CampaignActions({
           pending={pending}
           disabled={pending}
           title="Renvoyer la campagne ?"
-          description="Tous les destinataires seront remis en file et recevront à nouveau le message (délai ~14 s entre chaque envoi)."
+          description="Tous les destinataires seront remis en file et recevront à nouveau le message (envois espacés automatiquement)."
           confirmLabel="Renvoyer"
           variant="default"
           onConfirm={() =>

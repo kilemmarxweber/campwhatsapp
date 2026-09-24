@@ -22,7 +22,7 @@ export function CampaignLiveRefresh({ active }: { active: boolean }) {
 
   return (
     <p className="text-sm text-[var(--fg-muted)]" aria-live="polite">
-      Envoi en cours — file ~14 s entre chaque message · mise à jour auto…
+      Envoi en cours — messages espacés en file · mise à jour auto…
     </p>
   );
 }

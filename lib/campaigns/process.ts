@@ -2,12 +2,10 @@ import prisma from "@/lib/prisma";
 import { getKlamboClient } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { readUploadBuffer } from "@/lib/upload-file.server";
-
-const SEND_DELAY_MS = 14_000;
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+import {
+  enqueueWhatsAppTask,
+  withWhatsAppGuardianRetry,
+} from "@/lib/whatsapp-pace";
 
 function contactVars(contact: {
   name: string | null;
@@ -29,6 +27,10 @@ function contactVars(contact: {
       Object.entries(custom).map(([k, v]) => [k, v == null ? "" : String(v)]),
     ),
   };
+}
+
+function formatSendError(err: unknown) {
+  return err instanceof Error ? err.message : "Erreur d'envoi";
 }
 
 export async function processCampaign(campaignId: string) {
@@ -104,8 +106,7 @@ export async function processCampaign(campaignId: string) {
     throw new Error("Média Klambo manquant pour cette campagne");
   }
 
-  for (let i = 0; i < campaign.recipients.length; i++) {
-    const recipient = campaign.recipients[i]!;
+  for (const recipient of campaign.recipients) {
     const live = await prisma.campaign.findUnique({
       where: { id: campaignId },
       select: { status: true },
@@ -140,7 +141,14 @@ export async function processCampaign(campaignId: string) {
               idempotency_key: `${campaignId}:${recipient.contactId}`,
             };
 
-      const result = await client.send(payload);
+      // File process-wide + rythme humain + retry rate-limit
+      const result = await enqueueWhatsAppTask(() =>
+        withWhatsAppGuardianRetry(
+          () => client.send(payload),
+          formatSendError,
+        ),
+      );
+
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
         data: {
@@ -156,14 +164,10 @@ export async function processCampaign(campaignId: string) {
         where: { id: recipient.id },
         data: {
           status: "failed",
-          error: err instanceof Error ? err.message : "Erreur d'envoi",
+          error: formatSendError(err),
           renderedBody: body,
         },
       });
-    }
-
-    if (i < campaign.recipients.length - 1) {
-      await sleep(SEND_DELAY_MS);
     }
   }
 
