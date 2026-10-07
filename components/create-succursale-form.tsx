@@ -15,11 +15,18 @@ function slugify(value: string) {
     .slice(0, 48);
 }
 
-export function CreateSuccursaleForm() {
+export function CreateSuccursaleForm({
+  tenants,
+}: {
+  tenants: { id: string; name: string; slug: string }[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [tenantId, setTenantId] = useState(tenants[0]?.id ?? "new");
+  const [tenantName, setTenantName] = useState("");
+  const [tenantSlug, setTenantSlug] = useState("");
 
   return (
     <form
@@ -31,6 +38,9 @@ export function CreateSuccursaleForm() {
             const created = await createSuccursale({
               name,
               slug: slug || slugify(name),
+              ...(tenantId === "new"
+                ? { tenantName, tenantSlug: tenantSlug || slugify(tenantName) }
+                : { tenantId }),
             });
             toast.success("Succursale créée");
             router.push(`/o/${created.slug}`);
@@ -46,6 +56,25 @@ export function CreateSuccursaleForm() {
         Contacts et campagnes isolés par site. La connexion WhatsApp est
         partagée au siège.
       </p>
+      <div className="field">
+        <label htmlFor="branch-tenant">Organisation</label>
+        <select id="branch-tenant" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+          {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+          <option value="new">Créer une organisation</option>
+        </select>
+      </div>
+      {tenantId === "new" ? (
+        <>
+          <div className="field">
+            <label htmlFor="tenant-name">Nom de l’organisation</label>
+            <input id="tenant-name" required value={tenantName} onChange={(e) => { setTenantName(e.target.value); setTenantSlug(slugify(e.target.value)); }} />
+          </div>
+          <div className="field">
+            <label htmlFor="tenant-slug">Slug de l’organisation</label>
+            <input id="tenant-slug" required value={tenantSlug} onChange={(e) => setTenantSlug(slugify(e.target.value))} />
+          </div>
+        </>
+      ) : null}
       <div className="field">
         <label htmlFor="branch-name">Nom</label>
         <input

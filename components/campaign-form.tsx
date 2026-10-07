@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
-import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
+import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import {
   BASE_CONTACT_VARS,
   extractTemplateKeys,
@@ -26,6 +26,7 @@ type Template = {
   name: string;
   body: string;
   messageType: "text" | "image" | "video";
+  channel: "whatsapp" | "sms";
   mediaId: string | null;
   link1Label: string | null;
   link1Url: string | null;
@@ -38,6 +39,7 @@ type InitialCampaign = {
   name: string;
   bodyTemplate: string;
   messageType: "text" | "image" | "video";
+  channel: "whatsapp" | "sms";
   mediaId: string | null;
   contactListId: string | null;
   contactIds: string[];
@@ -65,6 +67,7 @@ export function CampaignForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(initial?.name ?? "");
+  const [channel, setChannel] = useState<"whatsapp" | "sms">(initial?.channel ?? "whatsapp");
   const [templateId, setTemplateId] = useState(
     initial?.templateId ?? templates[0]?.id ?? "",
   );
@@ -74,9 +77,10 @@ export function CampaignForm({
   const isEdit = Boolean(initial);
 
   const selectedTemplate = useMemo(
-    () => templates.find((t) => t.id === templateId) ?? null,
-    [templates, templateId],
+    () => templates.find((t) => t.id === templateId && t.channel === channel) ?? null,
+    [templates, templateId, channel],
   );
+  const channelTemplates = templates.filter((t) => t.channel === channel);
 
   const selectedMedia = useMemo(() => {
     if (!selectedTemplate?.mediaId) return null;
@@ -96,9 +100,11 @@ export function CampaignForm({
   const allMessageVariables = useMemo(() => {
     if (!selectedTemplate) return noteVariables;
     return extractTemplateKeys(
-      composeTemplateCaption(selectedTemplate.body, selectedTemplate, note),
+      channel === "sms"
+        ? composeSmsText(selectedTemplate.body, selectedTemplate, note)
+        : composeTemplateCaption(selectedTemplate.body, selectedTemplate, note),
     );
-  }, [selectedTemplate, note, noteVariables]);
+  }, [selectedTemplate, note, noteVariables, channel]);
 
   /** Clés proposées pour insertion dans le texte. */
   const insertableVariables = useMemo(() => {
@@ -121,11 +127,9 @@ export function CampaignForm({
 
   const captionPreview = useMemo(() => {
     if (!selectedTemplate) return note;
-    const composed = composeTemplateCaption(
-      selectedTemplate.body,
-      selectedTemplate,
-      note,
-    );
+    const composed = channel === "sms"
+      ? composeSmsText(selectedTemplate.body, selectedTemplate, note)
+      : composeTemplateCaption(selectedTemplate.body, selectedTemplate, note);
     const sample = contacts[0];
     if (!sample) return composed;
     return renderTemplate(composed, {
@@ -133,7 +137,7 @@ export function CampaignForm({
       phone: sample.phone || "{{phone}}",
       ...((sample.variables as Record<string, string>) ?? {}),
     });
-  }, [selectedTemplate, note, contacts]);
+  }, [selectedTemplate, note, contacts, channel]);
 
   function insertVariableIntoNote(key: string) {
     const token = `{{${key}}}`;
@@ -172,6 +176,7 @@ export function CampaignForm({
                 campaignId: initial.id,
                 name,
                 templateId,
+                channel,
                 note,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
@@ -184,12 +189,13 @@ export function CampaignForm({
                 orgSlug,
                 name,
                 templateId,
+                channel,
                 note,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
-                sendNow: true,
+                sendNow: channel === "whatsapp",
               });
-              toast.success("Campagne lancée");
+              toast.success(channel === "sms" ? "Campagne SMS enregistrée en brouillon" : "Campagne lancée");
               router.push(`/o/${orgSlug}/campaigns/${campaign.id}`);
             }
             router.refresh();
@@ -201,6 +207,13 @@ export function CampaignForm({
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(280px,340px)]">
         <div className="surface flex flex-col gap-4 p-5">
+          <div className="field">
+            <label htmlFor="campaign-channel">Canal</label>
+            <select id="campaign-channel" value={channel} disabled={isEdit} onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); setTemplateId(templates.find((t) => t.channel === next)?.id ?? ""); }}>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+            </select>
+          </div>
           <div className="field">
             <label htmlFor="campaign-name">Nom de la campagne</label>
             <input
@@ -214,7 +227,7 @@ export function CampaignForm({
 
           <div className="field">
             <label htmlFor="campaign-template">
-              Template (image + style + liens)
+              Template {channel === "sms" ? "SMS (texte et liens)" : "WhatsApp (image + style + liens)"}
             </label>
             <select
               id="campaign-template"
@@ -223,7 +236,7 @@ export function CampaignForm({
               onChange={(e) => setTemplateId(e.target.value)}
             >
               <option value="">Choisir…</option>
-              {templates.map((t) => (
+              {channelTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.messageType}
                   {t.link1Url ? " · liens" : ""})
@@ -300,11 +313,11 @@ export function CampaignForm({
                   : ""}
                 .
               </p>
-            </div>
+          </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        {channel === "whatsapp" ? <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
             Aperçu (template + note)
           </p>
@@ -321,7 +334,7 @@ export function CampaignForm({
                 : null
             }
           />
-        </div>
+        </div> : <div className="surface p-4 text-sm text-[var(--fg-muted)]"><p>SMS : texte et liens uniquement. L’envoi sera disponible après configuration d’un fournisseur SMS.</p><pre className="mt-3 whitespace-pre-wrap font-sans">{captionPreview}</pre></div>}
       </div>
 
       <div className="surface p-5">

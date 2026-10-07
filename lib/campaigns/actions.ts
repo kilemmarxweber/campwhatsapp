@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
-import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
+import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { enqueueCampaign } from "@/lib/campaigns/process";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { writeOrgUpload, resolveUploadAbsolutePath } from "@/lib/upload-file.server";
@@ -14,14 +14,19 @@ async function resolveCampaignContent(input: {
   organizationId: string;
   templateId: string;
   note?: string;
+  channel?: "whatsapp" | "sms";
 }) {
   const template = await prisma.messageTemplate.findFirst({
     where: {
       id: input.templateId,
       organizationId: input.organizationId,
+      ...(input.channel ? { channel: input.channel } : {}),
     },
   });
   if (!template) throw new Error("Template introuvable");
+  if (template.channel === "sms" && template.messageType !== "text") {
+    throw new Error("Un modèle SMS doit être uniquement textuel");
+  }
 
   if (
     (template.messageType === "image" || template.messageType === "video") &&
@@ -30,11 +35,9 @@ async function resolveCampaignContent(input: {
     throw new Error("Le template image/vidéo n'a pas de média");
   }
 
-  const bodyTemplate = composeTemplateCaption(
-    template.body,
-    template,
-    input.note,
-  );
+  const bodyTemplate = template.channel === "sms"
+    ? composeSmsText(template.body, template, input.note)
+    : composeTemplateCaption(template.body, template, input.note);
   if (!bodyTemplate.trim()) {
     throw new Error("Le message du template est vide");
   }
@@ -42,6 +45,7 @@ async function resolveCampaignContent(input: {
   return {
     bodyTemplate,
     messageType: template.messageType as "text" | "image" | "video",
+    channel: template.channel as "whatsapp" | "sms",
     mediaId: template.mediaId,
   };
 }
@@ -52,6 +56,7 @@ export async function createCampaign(input: {
   name: string;
   /** Contenu image / style / liens : toujours depuis le template. */
   templateId: string;
+  channel?: "whatsapp" | "sms";
   /** Texte simple ajouté sous le template (optionnel). */
   note?: string;
   contactListId?: string | null;
@@ -66,6 +71,7 @@ export async function createCampaign(input: {
     organizationId: input.organizationId,
     templateId: input.templateId,
     note: input.note,
+    channel: input.channel,
   });
 
   let contactIds = input.contactIds ?? [];
@@ -94,6 +100,7 @@ export async function createCampaign(input: {
       name: input.name.trim(),
       bodyTemplate: content.bodyTemplate,
       messageType: content.messageType,
+      channel: content.channel,
       mediaId: content.mediaId || null,
       contactListId: input.contactListId || null,
       status: "draft",
@@ -116,6 +123,9 @@ export async function createCampaign(input: {
     await requireOrganizationPermission(input.organizationId, {
       campaigns: ["send"],
     });
+    if (content.channel === "sms") {
+      throw new Error("L'envoi SMS n'est pas encore configuré. La campagne reste enregistrée en brouillon.");
+    }
     await prisma.campaign.update({
       where: { id: campaign.id },
       data: { status: "sending" },
@@ -143,6 +153,9 @@ export async function startCampaign(input: {
     },
   });
   if (!campaign) throw new Error("Campagne introuvable");
+  if (campaign.channel === "sms") {
+    throw new Error("L'envoi SMS n'est pas encore configuré.");
+  }
   if (campaign.status === "sending") {
     return campaign;
   }
@@ -165,8 +178,10 @@ export async function cancelCampaign(input: {
   await requireOrganizationPermission(input.organizationId, {
     campaigns: ["update"],
   });
+  const campaign = await prisma.campaign.findFirst({ where: { id: input.campaignId, organizationId: input.organizationId } });
+  if (!campaign) throw new Error("Campagne introuvable");
   await prisma.campaign.update({
-    where: { id: input.campaignId },
+    where: { id: campaign.id },
     data: { status: "cancelled" },
   });
   revalidatePath(`/o/${input.orgSlug}/campaigns`);
@@ -182,13 +197,19 @@ export async function retryFailedRecipients(input: {
     campaigns: ["send"],
   });
 
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: input.campaignId, organizationId: input.organizationId },
+  });
+  if (!campaign) throw new Error("Campagne introuvable");
+  if (campaign.channel === "sms") throw new Error("L'envoi SMS n'est pas encore configuré.");
+
   await prisma.campaignRecipient.updateMany({
     where: { campaignId: input.campaignId, status: "failed" },
     data: { status: "pending", error: null },
   });
 
   await prisma.campaign.update({
-    where: { id: input.campaignId },
+    where: { id: campaign.id },
     data: { status: "sending", completedAt: null },
   });
 
@@ -215,6 +236,7 @@ export async function resendCampaign(input: {
     },
   });
   if (!campaign) throw new Error("Campagne introuvable");
+  if (campaign.channel === "sms") throw new Error("L'envoi SMS n'est pas encore configuré.");
   if (campaign.status === "sending") {
     throw new Error("La campagne est déjà en cours d'envoi");
   }
@@ -262,6 +284,7 @@ export async function updateCampaign(input: {
   campaignId: string;
   name: string;
   templateId: string;
+  channel?: "whatsapp" | "sms";
   note?: string;
   contactListId?: string | null;
   contactIds?: string[];
@@ -288,6 +311,7 @@ export async function updateCampaign(input: {
     organizationId: input.organizationId,
     templateId: input.templateId,
     note: input.note,
+    channel: input.channel,
   });
 
   let contactIds = input.contactIds ?? [];
@@ -319,6 +343,7 @@ export async function updateCampaign(input: {
         name: input.name.trim(),
         bodyTemplate: content.bodyTemplate,
         messageType: content.messageType,
+        channel: content.channel,
         mediaId: content.mediaId || null,
         contactListId: input.contactListId || null,
         status: "draft",
@@ -507,6 +532,7 @@ export async function createTemplate(input: {
   name: string;
   body: string;
   messageType?: "text" | "image" | "video";
+  channel?: "whatsapp" | "sms";
   mediaId?: string | null;
   link1Label?: string | null;
   link1Url?: string | null;
@@ -518,6 +544,10 @@ export async function createTemplate(input: {
   });
 
   const messageType = input.messageType ?? "text";
+  const channel = input.channel ?? "whatsapp";
+  if (channel === "sms" && messageType !== "text") {
+    throw new Error("Les modèles SMS acceptent uniquement du texte et des liens");
+  }
   if (
     (messageType === "image" || messageType === "video") &&
     !input.mediaId
@@ -550,6 +580,7 @@ export async function createTemplate(input: {
       name: input.name.trim(),
       body: input.body,
       messageType,
+      channel,
       mediaId: messageType === "text" ? null : input.mediaId || null,
       link1Label: link1Url ? input.link1Label?.trim() || "Lien" : null,
       link1Url,
@@ -569,6 +600,7 @@ export async function updateTemplate(input: {
   name: string;
   body: string;
   messageType?: "text" | "image" | "video";
+  channel?: "whatsapp" | "sms";
   mediaId?: string | null;
   link1Label?: string | null;
   link1Url?: string | null;
@@ -588,6 +620,10 @@ export async function updateTemplate(input: {
   if (!existing) throw new Error("Template introuvable");
 
   const messageType = input.messageType ?? existing.messageType;
+  const channel = input.channel ?? existing.channel;
+  if (channel === "sms" && messageType !== "text") {
+    throw new Error("Les modèles SMS acceptent uniquement du texte et des liens");
+  }
   if (
     (messageType === "image" || messageType === "video") &&
     !input.mediaId
@@ -627,6 +663,7 @@ export async function updateTemplate(input: {
       name: input.name.trim(),
       body: input.body,
       messageType,
+      channel,
       mediaId: messageType === "text" ? null : input.mediaId || null,
       link1Label: link1Url ? input.link1Label?.trim() || "Lien" : null,
       link1Url,

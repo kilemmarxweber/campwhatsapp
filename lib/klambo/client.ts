@@ -9,6 +9,8 @@ export type KlamboSendPayload = {
   filename?: string;
   media?: { id?: string; link?: string };
   idempotency_key?: string;
+  /** Alternance multi-files côté API (campaign, payment…). */
+  queue_kind?: string;
 };
 
 export type KlamboSendResponse = {

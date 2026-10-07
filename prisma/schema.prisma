@@ -24,6 +24,7 @@ model User {
   accounts      Account[]
   invitations   Invitation[]
   members       Member[]
+  tenantMemberships TenantMember[]
   sessions      Session[]
 
   @@map("user")
@@ -85,6 +86,8 @@ model Organization {
   logo              String?
   createdAt         DateTime
   metadata          String?
+  tenantId          String?
+  tenant            TenantOrganization? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   invitations       Invitation[]
   members           Member[]
   organizationroles OrganizationRole[]
@@ -95,7 +98,34 @@ model Organization {
   templates         MessageTemplate[]
   campaigns         Campaign[]
 
+  @@index([tenantId])
   @@map("organization")
+}
+
+/// Organisation cliente parente; Organization représente une succursale Better Auth.
+model TenantOrganization {
+  id        String          @id @default(cuid())
+  name      String
+  slug      String          @unique
+  createdAt DateTime        @default(now())
+  branches  Organization[]
+  members   TenantMember[]
+
+  @@map("tenant_organization")
+}
+
+model TenantMember {
+  id        String             @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      String             @default("member")
+  createdAt DateTime           @default(now())
+  tenant    TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("tenant_member")
 }
 
 model OrganizationRole {
@@ -273,6 +303,7 @@ model MessageTemplate {
   name           String
   body           String
   messageType    CampaignMessageType @default(text)
+  channel        CampaignChannel     @default(whatsapp)
   mediaId        String?
   link1Label     String?
   link1Url       String?
@@ -304,6 +335,11 @@ enum CampaignMessageType {
   video
 }
 
+enum CampaignChannel {
+  whatsapp
+  sms
+}
+
 enum RecipientStatus {
   pending
   queued
@@ -320,6 +356,7 @@ model Campaign {
   name           String
   status         CampaignStatus      @default(draft)
   messageType    CampaignMessageType @default(text)
+  channel        CampaignChannel     @default(whatsapp)
   bodyTemplate   String
   mediaId        String?
   contactListId  String?

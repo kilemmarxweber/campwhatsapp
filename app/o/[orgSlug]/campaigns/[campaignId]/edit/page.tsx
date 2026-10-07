@@ -46,6 +46,7 @@ export default async function EditCampaignPage({
         name: true,
         body: true,
         messageType: true,
+        channel: true,
         mediaId: true,
         link1Label: true,
         link1Url: true,
@@ -59,12 +60,14 @@ export default async function EditCampaignPage({
     templates.find(
       (t) =>
         t.messageType === campaign.messageType &&
+        t.channel === campaign.channel &&
         t.mediaId === campaign.mediaId &&
         campaign.bodyTemplate.startsWith(t.body.trim()),
     ) ??
     templates.find(
       (t) =>
         t.messageType === campaign.messageType &&
+        t.channel === campaign.channel &&
         t.mediaId === campaign.mediaId,
     ) ??
     templates[0];
@@ -87,6 +90,7 @@ export default async function EditCampaignPage({
           name: campaign.name,
           bodyTemplate: campaign.bodyTemplate,
           messageType: campaign.messageType,
+          channel: campaign.channel,
           mediaId: campaign.mediaId,
           contactListId: campaign.contactListId,
           contactIds: campaign.recipients.map((r) => r.contactId),

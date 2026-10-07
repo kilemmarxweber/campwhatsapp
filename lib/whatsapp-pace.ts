@@ -1,21 +1,60 @@
 /**
- * File WhatsApp process-wide : un message après l’autre, rythme « humain ».
- * Utilisé par les campagnes (Klambo / GOWA) pour limiter les blocages anti-spam.
+ * File WhatsApp process-wide — un message après l’autre.
+ *
+ * Profil `qr` (GOWA / Klambo QR) : très prudent (lots ~50+).
+ * Profil `cloud` (Meta) : plus rapide.
+ *
+ * Les chats sortants apparaissent toujours sur le téléphone scanné (sync
+ * multi-appareils WhatsApp) — ce n’est pas une « copie » API.
  */
 
-/** Écart de base. Surcharge : WHATSAPP_SEND_GAP_MS */
-export const WHATSAPP_SEND_GAP_MS = readEnvMs(
-  "WHATSAPP_SEND_GAP_MS",
-  14_000,
-);
+export type WhatsAppPaceProfile = "qr" | "cloud";
 
-const MIN_GAP_MS = 3_500;
-const MAX_GAP_MS = 90_000;
-const MAX_GUARDIAN_RETRIES = 5;
-const SESSION_IDLE_MS = 3 * 60_000;
-const ELEVATED_HOLD_MS = 2 * 60_000;
-const ELEVATED_GAP_MULTIPLIER = 1.75;
+type ProfileConfig = {
+  baseGapMs: number;
+  minGapMs: number;
+  maxGapMs: number;
+  chunkEvery: number;
+  chunkBreakMinMs: number;
+  chunkBreakMaxMs: number;
+  softCap: number;
+  hardCap: number;
+  hardBreakMinMs: number;
+  hardBreakMaxMs: number;
+};
 
+const PROFILES: Record<WhatsAppPaceProfile, ProfileConfig> = {
+  qr: {
+    baseGapMs: readEnvMs("WHATSAPP_SEND_GAP_MS", 32_000, 12_000),
+    minGapMs: 12_000,
+    maxGapMs: 12 * 60_000,
+    chunkEvery: 8,
+    chunkBreakMinMs: 3 * 60_000,
+    chunkBreakMaxMs: 6 * 60_000,
+    softCap: 32,
+    hardCap: 48,
+    hardBreakMinMs: 8 * 60_000,
+    hardBreakMaxMs: 14 * 60_000,
+  },
+  cloud: {
+    baseGapMs: readEnvMs("WHATSAPP_SEND_GAP_MS", 8_000, 3_500),
+    minGapMs: 3_500,
+    maxGapMs: 90_000,
+    chunkEvery: 20,
+    chunkBreakMinMs: 20_000,
+    chunkBreakMaxMs: 45_000,
+    softCap: 80,
+    hardCap: 150,
+    hardBreakMinMs: 60_000,
+    hardBreakMaxMs: 120_000,
+  },
+};
+
+const MAX_GUARDIAN_RETRIES = 4;
+const SESSION_IDLE_MS = 8 * 60_000;
+const CIRCUIT_HOLD_MS = 20 * 60_000;
+
+let profile: WhatsAppPaceProfile = "qr";
 let chain: Promise<void> = Promise.resolve();
 let lastSendAt = 0;
 let consecutiveOk = 0;
@@ -23,13 +62,31 @@ let elevatedUntil = 0;
 let elevatedGapMs = 0;
 let moodFactor = 1;
 let sinceHumanBreak = 0;
+let sinceChunk = 0;
+let circuitOpenUntil = 0;
 
-function readEnvMs(name: string, fallback: number): number {
+function readEnvMs(name: string, fallback: number, minFloor: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < MIN_GAP_MS) return fallback;
-  return Math.min(Math.round(n), MAX_GAP_MS);
+  if (!Number.isFinite(n) || n < minFloor) return fallback;
+  return Math.round(n);
+}
+
+function cfg(): ProfileConfig {
+  return PROFILES[profile];
+}
+
+export function setWhatsAppPaceProfile(next: WhatsAppPaceProfile) {
+  profile = next;
+}
+
+export function isWhatsAppCircuitOpen(): boolean {
+  return Date.now() < circuitOpenUntil;
+}
+
+export function getWhatsAppCircuitRemainingMs(): number {
+  return Math.max(0, circuitOpenUntil - Date.now());
 }
 
 export function sleepMs(ms: number) {
@@ -57,54 +114,74 @@ function gaussianNoise(sigma = 1) {
 }
 
 function humanJitter(baseMs: number): number {
-  const noisy = baseMs * (1.06 + gaussianNoise(0.18));
-  const crumbs = randInt(47, 891);
-  return Math.round(clamp(noisy + crumbs, MIN_GAP_MS, MAX_GAP_MS));
+  const { minGapMs, maxGapMs } = cfg();
+  const noisy = baseMs * (1.08 + gaussianNoise(0.2));
+  const crumbs = randInt(73, 1_247);
+  return Math.round(clamp(noisy + crumbs, minGapMs, maxGapMs));
 }
 
 function driftMood() {
-  moodFactor += gaussianNoise(0.04);
-  moodFactor = clamp(moodFactor * 0.92 + 0.08 * 1, 0.82, 1.38);
+  moodFactor += gaussianNoise(0.045);
+  moodFactor = clamp(moodFactor * 0.9 + 0.1 * 1, 0.88, 1.45);
 }
 
 function warmUpExtraMs(): number {
-  if (consecutiveOk === 0) return randInt(1_200, 4_800);
-  if (consecutiveOk === 1) return randInt(400, 2_200);
-  if (consecutiveOk === 2) return randInt(0, 1_100);
+  if (consecutiveOk === 0) return randInt(2_000, 8_000);
+  if (consecutiveOk === 1) return randInt(800, 4_000);
+  if (consecutiveOk === 2) return randInt(0, 2_000);
   return 0;
 }
 
 function fatigueExtraMs(okCount: number): number {
-  if (okCount < 4) return 0;
-  const t = okCount - 3;
-  const soft = Math.sqrt(t) * 2_800 + t * 900;
-  return Math.round(clamp(soft + gaussianNoise(400), 0, 28_000));
+  const { softCap } = cfg();
+  if (okCount < 5) return 0;
+  const t = okCount - 4;
+  let soft = Math.sqrt(t) * 3_500 + t * 1_200;
+  if (okCount >= softCap) {
+    soft += (okCount - softCap + 1) * 4_500;
+  }
+  return Math.round(clamp(soft + gaussianNoise(600), 0, 90_000));
 }
 
 function maybeHumanBreakMs(): number {
   sinceHumanBreak += 1;
-  const pressure = Math.min(0.55, 0.08 + sinceHumanBreak * 0.035);
+  const pressure = Math.min(0.5, 0.06 + sinceHumanBreak * 0.028);
   if (rand() > pressure) return 0;
-
   sinceHumanBreak = 0;
   const roll = rand();
-  if (roll < 0.55) return randInt(2_500, 7_500);
-  if (roll < 0.88) return randInt(8_000, 22_000);
-  return randInt(25_000, 55_000);
+  if (roll < 0.5) return randInt(3_000, 9_000);
+  if (roll < 0.85) return randInt(12_000, 35_000);
+  return randInt(40_000, 90_000);
+}
+
+function maybeChunkBreakMs(): number {
+  const { chunkEvery, chunkBreakMinMs, chunkBreakMaxMs } = cfg();
+  sinceChunk += 1;
+  if (sinceChunk < chunkEvery) return 0;
+  sinceChunk = 0;
+  return randInt(chunkBreakMinMs, chunkBreakMaxMs);
+}
+
+function maybeHardBreakMs(): number {
+  const { hardCap, hardBreakMinMs, hardBreakMaxMs } = cfg();
+  if (consecutiveOk === 0 || consecutiveOk % hardCap !== 0) return 0;
+  return randInt(hardBreakMinMs, hardBreakMaxMs);
 }
 
 function currentBaseGapMs(): number {
   const now = Date.now();
+  const base = cfg().baseGapMs;
   if (now < elevatedUntil && elevatedGapMs > 0) {
-    return Math.max(WHATSAPP_SEND_GAP_MS, elevatedGapMs);
+    return Math.max(base, elevatedGapMs);
   }
-  return WHATSAPP_SEND_GAP_MS;
+  return base;
 }
 
 function refreshSessionIfIdle() {
   if (lastSendAt > 0 && Date.now() - lastSendAt > SESSION_IDLE_MS) {
     consecutiveOk = 0;
     sinceHumanBreak = 0;
+    sinceChunk = 0;
     moodFactor = 0.95 + rand() * 0.2;
   }
 }
@@ -112,29 +189,28 @@ function refreshSessionIfIdle() {
 export function nextWhatsAppGapMs(): number {
   refreshSessionIfIdle();
   driftMood();
-
   const base =
     currentBaseGapMs() * moodFactor +
     fatigueExtraMs(consecutiveOk) +
     warmUpExtraMs() +
-    maybeHumanBreakMs();
-
+    maybeHumanBreakMs() +
+    maybeChunkBreakMs() +
+    maybeHardBreakMs();
   return humanJitter(base);
 }
 
 function preSendHesitationMs(): number {
   const roll = rand();
-  if (roll < 0.15) return 0;
-  if (roll < 0.7) return randInt(180, 900);
-  if (roll < 0.92) return randInt(900, 2_200);
-  return randInt(2_200, 4_500);
+  if (roll < 0.12) return 0;
+  if (roll < 0.65) return randInt(250, 1_200);
+  if (roll < 0.9) return randInt(1_200, 3_000);
+  return randInt(3_000, 6_500);
 }
 
 export function parseWhatsAppRetryWaitMs(
   message?: string | null,
 ): number | null {
   if (!message) return null;
-
   const waitSec =
     message.match(/Wait\s+(\d+(?:\.\d+)?)\s*s/i) ??
     message.match(/réessayez?\s+dans\s+(\d+(?:\.\d+)?)\s*s/i) ??
@@ -143,35 +219,39 @@ export function parseWhatsAppRetryWaitMs(
   if (waitSec) {
     const sec = Number(waitSec[1]);
     if (Number.isFinite(sec) && sec > 0) {
-      return humanJitter((sec + 1.2) * 1000);
+      return humanJitter((sec + 2) * 1000);
     }
   }
-
   if (
-    /Guardian|anti-ban|RATE_LIMIT|rate.?limit|too many|pace WhatsApp|429|Klambo 429/i.test(
+    /Guardian|anti-ban|RATE_LIMIT|rate.?limit|too many|pace WhatsApp|429|restrict|bloqu|spam|temporarily banned|connexion.*limit/i.test(
       message,
     )
   ) {
-    return humanJitter(
-      Math.max(WHATSAPP_SEND_GAP_MS, currentBaseGapMs()) * 1.35,
-    );
+    return humanJitter(Math.max(cfg().baseGapMs, currentBaseGapMs()) * 2.2);
   }
-
   return null;
+}
+
+function openCircuit(reasonMs?: number) {
+  const hold = Math.max(reasonMs ?? 0, CIRCUIT_HOLD_MS);
+  circuitOpenUntil = Date.now() + hold;
+  consecutiveOk = 0;
+  sinceChunk = 0;
+  sinceHumanBreak = 0;
+  moodFactor = 1.25;
+  elevatedGapMs = cfg().baseGapMs * 2.5;
+  elevatedUntil = circuitOpenUntil;
 }
 
 function noteRateLimitHit(waitMs: number) {
   consecutiveOk = 0;
   sinceHumanBreak = 0;
-  moodFactor = clamp(moodFactor + 0.15, 1.05, 1.38);
+  sinceChunk = 0;
+  moodFactor = clamp(moodFactor + 0.2, 1.1, 1.45);
   elevatedGapMs = Math.round(
-    Math.max(
-      waitMs,
-      WHATSAPP_SEND_GAP_MS * ELEVATED_GAP_MULTIPLIER,
-      currentBaseGapMs() * ELEVATED_GAP_MULTIPLIER,
-    ),
+    Math.max(waitMs, cfg().baseGapMs * 2, currentBaseGapMs() * 2),
   );
-  elevatedUntil = Date.now() + ELEVATED_HOLD_MS;
+  elevatedUntil = Date.now() + Math.max(waitMs * 3, 5 * 60_000);
 }
 
 function noteSuccessfulSend() {
@@ -181,10 +261,11 @@ function noteSuccessfulSend() {
   }
 }
 
-/** File unique process-wide (sérialise aussi plusieurs campagnes en parallèle). */
 export function enqueueWhatsAppTask<T>(task: () => Promise<T>): Promise<T> {
   const run = async () => {
     refreshSessionIfIdle();
+    const circuitWait = getWhatsAppCircuitRemainingMs();
+    if (circuitWait > 0) await sleepMs(circuitWait);
 
     const gap = nextWhatsAppGapMs();
     const wait = lastSendAt > 0 ? lastSendAt + gap - Date.now() : 0;
@@ -215,7 +296,6 @@ export async function withWhatsAppGuardianRetry<T>(
   getErrorMessage: (error: unknown) => string,
 ): Promise<T> {
   let lastError: unknown;
-
   for (let attempt = 0; attempt < MAX_GUARDIAN_RETRIES; attempt += 1) {
     try {
       return await task();
@@ -223,17 +303,17 @@ export async function withWhatsAppGuardianRetry<T>(
       lastError = error;
       const message = getErrorMessage(error);
       const waitMs = parseWhatsAppRetryWaitMs(message);
-
       if (waitMs == null || attempt === MAX_GUARDIAN_RETRIES - 1) {
+        if (waitMs != null) {
+          openCircuit(Math.max(waitMs * 5, CIRCUIT_HOLD_MS));
+        }
         throw error;
       }
-
       noteRateLimitHit(waitMs);
-      const backoff = waitMs * Math.pow(1.4, attempt) + randInt(400, 2_500);
-      await sleepMs(clamp(Math.round(backoff), MIN_GAP_MS, MAX_GAP_MS));
+      const backoff = waitMs * Math.pow(1.5, attempt) + randInt(1_000, 5_000);
+      await sleepMs(clamp(Math.round(backoff), cfg().minGapMs, cfg().maxGapMs));
     }
   }
-
   throw lastError;
 }
 
@@ -245,4 +325,7 @@ export function __resetWhatsAppPaceForTests() {
   elevatedGapMs = 0;
   moodFactor = 1;
   sinceHumanBreak = 0;
+  sinceChunk = 0;
+  circuitOpenUntil = 0;
+  profile = "qr";
 }

@@ -88,7 +88,7 @@ export default async function CampaignsPage({
                       {c.name}
                     </Link>
                   </td>
-                  <td>{c.messageType}</td>
+                  <td>{c.channel.toUpperCase()} · {c.messageType}</td>
                   <td>
                     <span className={statusBadge(c.status)}>{c.status}</span>
                   </td>

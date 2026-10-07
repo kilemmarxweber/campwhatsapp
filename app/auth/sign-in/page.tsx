@@ -63,10 +63,7 @@ export default function SignInPage() {
         </button>
       </form>
       <p className="mt-4 text-sm text-[var(--fg-muted)]">
-        Pas de compte ?{" "}
-        <Link href="/auth/sign-up" className="text-[var(--accent)]">
-          S&apos;inscrire
-        </Link>
+        Un compte est créé uniquement sur invitation d’une organisation.
       </p>
     </main>
   );

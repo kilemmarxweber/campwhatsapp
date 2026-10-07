@@ -21,6 +21,7 @@ export default async function TemplatesPage({
         name: true,
         body: true,
         messageType: true,
+        channel: true,
         mediaId: true,
         link1Label: true,
         link1Url: true,

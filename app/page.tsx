@@ -31,9 +31,6 @@ export default async function HomePage() {
         <Link href="/auth/sign-in" className="btn btn-primary">
           Se connecter
         </Link>
-        <Link href="/auth/sign-up" className="btn btn-brand">
-          Créer un compte
-        </Link>
       </div>
       <p className="mt-10 text-sm text-[var(--fg-muted)]">
         <a

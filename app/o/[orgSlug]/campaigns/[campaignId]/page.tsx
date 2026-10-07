@@ -55,7 +55,7 @@ export default async function CampaignDetailPage({
         <div>
           <h1 className="text-2xl font-semibold">{campaign.name}</h1>
           <p className="text-[var(--fg-muted)]">
-            {campaign.messageType} ·{" "}
+            {campaign.channel.toUpperCase()} · {campaign.messageType} ·{" "}
             <span className="badge">{campaign.status}</span>
           </p>
         </div>

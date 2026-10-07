@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { signUp } from "@/lib/auth-client";
+import { authClient, signUp } from "@/lib/auth-client";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -12,18 +12,34 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [invitationId, setInvitationId] = useState("");
+
+  useEffect(() => {
+    setInvitationId(new URLSearchParams(window.location.search).get("invitationId") ?? "");
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp.email({ name, email, password });
+    if (!invitationId) {
+      toast.error("Une invitation valide est nécessaire pour créer un compte.");
+      setLoading(false);
+      return;
+    }
+    const signUpInput = { name, email, password, invitationId };
+    const { error } = await signUp.email(signUpInput);
     setLoading(false);
     if (error) {
       toast.error(error.message ?? "Inscription impossible");
       return;
     }
+    const accepted = await authClient.organization.acceptInvitation({ invitationId });
+    if (accepted.error) {
+      toast.error(accepted.error.message ?? "Invitation créée mais rattachement à l’organisation impossible");
+      return;
+    }
     toast.success("Compte créé");
-    router.push("/onboarding");
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -35,7 +51,7 @@ export default function SignUpPage() {
       <h1 className="mb-6 text-3xl font-semibold text-[var(--tvs-blue-deep)]">
         Créer un compte
       </h1>
-      <form onSubmit={onSubmit} className="surface flex flex-col gap-4 p-6">
+      {invitationId ? <form onSubmit={onSubmit} className="surface flex flex-col gap-4 p-6">
         <div className="field">
           <label htmlFor="name">Nom</label>
           <input
@@ -71,7 +87,7 @@ export default function SignUpPage() {
         <button className="btn btn-primary" disabled={loading} type="submit">
           {loading ? "Création…" : "S'inscrire"}
         </button>
-      </form>
+      </form> : <p className="surface p-6 text-sm text-[var(--fg-muted)]">La création d’un compte est réservée aux personnes invitées par une organisation. Ouvrez le lien d’invitation reçu pour continuer.</p>}
       <p className="mt-4 text-sm text-[var(--fg-muted)]">
         Déjà un compte ?{" "}
         <Link href="/auth/sign-in" className="text-[var(--accent)]">

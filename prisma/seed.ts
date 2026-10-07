@@ -74,6 +74,11 @@ async function ensureUser() {
 }
 
 async function ensureOrg(userId: string) {
+  const tenant = await prisma.tenantOrganization.upsert({
+    where: { slug: ORG_SLUG },
+    create: { name: ORG_NAME, slug: ORG_SLUG },
+    update: { name: ORG_NAME },
+  });
   let org = await prisma.organization.findUnique({ where: { slug: ORG_SLUG } });
   if (!org) {
     org = await prisma.organization.create({
@@ -88,6 +93,13 @@ async function ensureOrg(userId: string) {
     console.log(`✓ Organisation créée : ${ORG_NAME}`);
   } else {
     console.log(`· Organisation existante : ${ORG_SLUG}`);
+  }
+
+  if (org.tenantId !== tenant.id) {
+    org = await prisma.organization.update({
+      where: { id: org.id },
+      data: { tenantId: tenant.id },
+    });
   }
 
   const member = await prisma.member.findFirst({
@@ -105,6 +117,12 @@ async function ensureOrg(userId: string) {
     });
     console.log("✓ Membre owner lié");
   }
+
+  await prisma.tenantMember.upsert({
+    where: { tenantId_userId: { tenantId: tenant.id, userId } },
+    create: { tenantId: tenant.id, userId, role: "owner" },
+    update: {},
+  });
 
   return org;
 }

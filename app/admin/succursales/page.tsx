@@ -4,7 +4,7 @@ import { CreateSuccursaleForm } from "@/components/create-succursale-form";
 import { isKlamboConfigured } from "@/lib/klambo/org";
 
 export default async function AdminSuccursalesPage() {
-  const [orgs, klamboOk] = await Promise.all([
+  const [orgs, tenants, klamboOk] = await Promise.all([
     prisma.organization.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -13,6 +13,7 @@ export default async function AdminSuccursalesPage() {
         },
       },
     }),
+    prisma.tenantOrganization.findMany({ orderBy: { name: "asc" } }),
     isKlamboConfigured(),
   ]);
 
@@ -47,13 +48,14 @@ export default async function AdminSuccursalesPage() {
         </div>
       ) : null}
 
-      <CreateSuccursaleForm />
+      <CreateSuccursaleForm tenants={tenants} />
 
       <div className="surface overflow-hidden">
         <table className="table">
           <thead>
             <tr>
               <th>Succursale</th>
+              <th>Organisation</th>
               <th>Membres</th>
               <th>Contacts</th>
               <th>Campagnes</th>
@@ -63,7 +65,7 @@ export default async function AdminSuccursalesPage() {
           <tbody>
             {orgs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-[var(--fg-muted)]">
+                <td colSpan={6} className="text-[var(--fg-muted)]">
                   Aucune succursale — créez la première ci-dessus.
                 </td>
               </tr>
@@ -76,6 +78,7 @@ export default async function AdminSuccursalesPage() {
                       /{org.slug}
                     </p>
                   </td>
+                  <td>{tenants.find((tenant) => tenant.id === org.tenantId)?.name ?? "—"}</td>
                   <td>{org._count.members}</td>
                   <td>{org._count.contacts}</td>
                   <td>{org._count.campaigns}</td>

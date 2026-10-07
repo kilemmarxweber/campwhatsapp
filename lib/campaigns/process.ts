@@ -2,10 +2,6 @@ import prisma from "@/lib/prisma";
 import { getKlamboClient } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { readUploadBuffer } from "@/lib/upload-file.server";
-import {
-  enqueueWhatsAppTask,
-  withWhatsAppGuardianRetry,
-} from "@/lib/whatsapp-pace";
 
 function contactVars(contact: {
   name: string | null;
@@ -31,6 +27,12 @@ function contactVars(contact: {
 
 function formatSendError(err: unknown) {
   return err instanceof Error ? err.message : "Erreur d'envoi";
+}
+
+function isApiRateLimitStop(message: string) {
+  return /Guardian|anti-ban|RATE_LIMIT|rate.?limit|429|restrict|bloqu|spam|temporarily banned/i.test(
+    message,
+  );
 }
 
 export async function processCampaign(campaignId: string) {
@@ -106,6 +108,7 @@ export async function processCampaign(campaignId: string) {
     throw new Error("Média Klambo manquant pour cette campagne");
   }
 
+  // Pacing anti-restriction : géré côté API Klambo (queue appareil + rythme humain)
   for (const recipient of campaign.recipients) {
     const live = await prisma.campaign.findUnique({
       where: { id: campaignId },
@@ -131,6 +134,7 @@ export async function processCampaign(campaignId: string) {
               type: "text" as const,
               text: body,
               idempotency_key: `${campaignId}:${recipient.contactId}`,
+              queue_kind: "campaign",
             }
           : {
               to: recipient.contact.phone,
@@ -139,15 +143,10 @@ export async function processCampaign(campaignId: string) {
               media: { id: klamboMediaId! },
               filename: campaign.media?.filename,
               idempotency_key: `${campaignId}:${recipient.contactId}`,
+              queue_kind: "campaign",
             };
 
-      // File process-wide + rythme humain + retry rate-limit
-      const result = await enqueueWhatsAppTask(() =>
-        withWhatsAppGuardianRetry(
-          () => client.send(payload),
-          formatSendError,
-        ),
-      );
+      const result = await client.send(payload);
 
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
@@ -160,14 +159,25 @@ export async function processCampaign(campaignId: string) {
         },
       });
     } catch (err) {
+      const error = formatSendError(err);
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
         data: {
           status: "failed",
-          error: formatSendError(err),
+          error,
           renderedBody: body,
         },
       });
+      if (isApiRateLimitStop(error)) {
+        await prisma.campaignRecipient.updateMany({
+          where: {
+            campaignId,
+            status: { in: ["pending", "queued"] },
+          },
+          data: { status: "pending" },
+        });
+        break;
+      }
     }
   }
 

@@ -4,6 +4,7 @@ import { admin, customSession, organization } from "better-auth/plugins";
 import prisma from "@/lib/prisma";
 import {
   assertUserCanJoinOrganization,
+  ensureTenantMembership,
   getSessionOrganizationContext,
 } from "@/lib/auth/org-membership";
 import {
@@ -56,7 +57,7 @@ const authOptions = {
       // En prod : brancher un vrai SMTP. En local : invitation créée quand même.
       sendInvitationEmail: async (data) => {
         console.info(
-          `[invite] ${data.email} → ${data.organization.name} (${data.invitation.role})`,
+          `[invite] ${data.email} → ${data.organization.name} (${data.invitation.role}) ${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/auth/sign-up?invitationId=${data.invitation.id}`,
         );
       },
       organizationHooks: {
@@ -65,6 +66,9 @@ const authOptions = {
         },
         beforeAcceptInvitation: async ({ user, organization }) => {
           await assertUserCanJoinOrganization(user.id, organization.id);
+        },
+        afterAddMember: async ({ user, organization }) => {
+          await ensureTenantMembership(user.id, organization.id);
         },
         afterCreateOrganization: async ({ organization }) => {
           await seedSystemGlobalRoles();

@@ -8,7 +8,7 @@ import {
   deleteTemplate,
   updateTemplate,
 } from "@/lib/campaigns/actions";
-import { composeTemplateCaption } from "@/lib/campaigns/compose-caption";
+import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { MediaThumb } from "@/components/media-thumb";
 import {
@@ -25,6 +25,7 @@ type TemplateRow = {
   name: string;
   body: string;
   messageType: "text" | "image" | "video";
+  channel: "whatsapp" | "sms";
   mediaId: string | null;
   link1Label: string | null;
   link1Url: string | null;
@@ -59,6 +60,7 @@ export function TemplatesClient({
   const [messageType, setMessageType] = useState<"text" | "image" | "video">(
     "image",
   );
+  const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [mediaId, setMediaId] = useState("");
   const [textStyle, setTextStyle] = useState<TextStyle>("normal");
   const [link1Label, setLink1Label] = useState("Site TVS");
@@ -73,7 +75,9 @@ export function TemplatesClient({
 
   const captionPreview = useMemo(
     () =>
-      composeTemplateCaption(applyTextStyle(body, textStyle), {
+      channel === "sms"
+        ? composeSmsText(body, { link1Label, link1Url, link2Label, link2Url })
+        : composeTemplateCaption(applyTextStyle(body, textStyle), {
         link1Label,
         link1Url,
         link2Label,
@@ -87,6 +91,7 @@ export function TemplatesClient({
     setName("");
     setBody(DEFAULT_BODY);
     setMessageType("image");
+    setChannel("whatsapp");
     setMediaId("");
     setTextStyle("normal");
     setLink1Label("Site TVS");
@@ -100,6 +105,7 @@ export function TemplatesClient({
     setName(t.name);
     setBody(t.body);
     setMessageType(t.messageType);
+    setChannel(t.channel);
     setMediaId(t.mediaId ?? "");
     setTextStyle("normal");
     setLink1Label(t.link1Label ?? "Site TVS");
@@ -124,8 +130,9 @@ export function TemplatesClient({
     organizationId,
     orgSlug,
     name,
-    body: applyTextStyle(body, textStyle),
+      body: channel === "sms" ? body : applyTextStyle(body, textStyle),
     messageType,
+    channel,
     mediaId: mediaId || null,
     link1Label: link1Url.trim() ? link1Label : null,
     link1Url: link1Url.trim() || null,
@@ -192,10 +199,18 @@ export function TemplatesClient({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="field">
+              <label htmlFor="tpl-channel">Canal</label>
+              <select id="tpl-channel" value={channel} onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); if (next === "sms") { setMessageType("text"); setMediaId(""); } }}>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="sms">SMS</option>
+              </select>
+            </div>
+            <div className="field">
               <label htmlFor="tpl-type">Type</label>
               <select
                 id="tpl-type"
                 value={messageType}
+                disabled={channel === "sms"}
                 onChange={(e) => {
                   const next = e.target.value as "text" | "image" | "video";
                   setMessageType(next);
@@ -207,7 +222,7 @@ export function TemplatesClient({
                 <option value="video">Vidéo + légende</option>
               </select>
             </div>
-            <div className="field">
+            {channel === "whatsapp" ? <div className="field">
               <label htmlFor="tpl-style">Style du texte</label>
               <select
                 id="tpl-style"
@@ -218,10 +233,10 @@ export function TemplatesClient({
                 <option value="promo">Promo (titre en gras)</option>
                 <option value="offer">Offre (accent + emoji)</option>
               </select>
-            </div>
+            </div> : <div className="rounded-lg bg-[var(--tvs-blue-soft)]/40 p-3 text-sm text-[var(--fg-muted)]">SMS : texte et liens uniquement, sans média.</div>}
           </div>
 
-          {(messageType === "image" || messageType === "video") && (
+          {channel === "whatsapp" && (messageType === "image" || messageType === "video") && (
             <div className="field">
               <label htmlFor="tpl-media">Média</label>
               <select
@@ -330,7 +345,7 @@ export function TemplatesClient({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
+        {channel === "whatsapp" ? <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
             Aperçu carte
           </p>
@@ -348,12 +363,12 @@ export function TemplatesClient({
                 : null
             }
           />
-        </div>
+        </div> : null}
       </form>
 
       <ul className="flex flex-col gap-3">
-        {templates.map((t) => {
-          const full = composeTemplateCaption(t.body, t);
+          {templates.map((t) => {
+          const full = t.channel === "sms" ? composeSmsText(t.body, t) : composeTemplateCaption(t.body, t);
           const isEditing = editingId === t.id;
           return (
             <li
@@ -364,6 +379,7 @@ export function TemplatesClient({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{t.name}</p>
                   <span className="badge">{t.messageType}</span>
+                  <span className="badge">{t.channel.toUpperCase()}</span>
                   {t.media && (
                     <span className="text-sm text-[var(--fg-muted)]">
                       {t.media.filename}

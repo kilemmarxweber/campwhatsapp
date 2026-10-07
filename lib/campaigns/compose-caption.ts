@@ -31,3 +31,18 @@ export function composeTemplateCaption(
 
   return parts.filter(Boolean).join("\n\n");
 }
+
+/** Corps SMS en texte brut: les URL restent copiables et sans décorations média. */
+export function composeSmsText(
+  body: string,
+  links: TemplateLinks,
+  extraNote?: string,
+): string {
+  const parts = [body.trim()];
+  const l1 = links.link1Url?.trim();
+  if (l1) parts.push(`${links.link1Label?.trim() || "Lien"}: ${l1}`);
+  const l2 = links.link2Url?.trim();
+  if (l2) parts.push(`${links.link2Label?.trim() || "Lien"}: ${l2}`);
+  if (extraNote?.trim()) parts.push(extraNote.trim());
+  return parts.filter(Boolean).join("\n\n");
+}

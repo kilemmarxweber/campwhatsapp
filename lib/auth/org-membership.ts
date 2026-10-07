@@ -5,6 +5,12 @@ export async function assertUserCanJoinOrganization(
   userId: string,
   organizationId: string,
 ) {
+  const target = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { tenantId: true },
+  });
+  if (!target?.tenantId) throw new Error("Cette succursale n'est liée à aucune organisation.");
+
   const existing = await prisma.member.findFirst({
     where: { userId, organizationId },
     select: { id: true },
@@ -12,6 +18,34 @@ export async function assertUserCanJoinOrganization(
   if (existing) {
     throw new Error("Vous êtes déjà membre de cette organisation.");
   }
+
+  const otherMemberships = await prisma.member.findMany({
+    where: { userId },
+    select: { organization: { select: { tenantId: true } } },
+  });
+  if (otherMemberships.some((m) => m.organization.tenantId !== target.tenantId)) {
+    throw new Error("Cet utilisateur appartient déjà à une autre organisation.");
+  }
+  const tenantMemberships = await prisma.tenantMember.findMany({
+    where: { userId },
+    select: { tenantId: true },
+  });
+  if (tenantMemberships.some((membership) => membership.tenantId !== target.tenantId)) {
+    throw new Error("Cet utilisateur appartient déjà à une autre organisation.");
+  }
+}
+
+export async function ensureTenantMembership(userId: string, organizationId: string) {
+  const branch = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { tenantId: true },
+  });
+  if (!branch?.tenantId) return;
+  await prisma.tenantMember.upsert({
+    where: { tenantId_userId: { tenantId: branch.tenantId, userId } },
+    create: { tenantId: branch.tenantId, userId },
+    update: {},
+  });
 }
 
 export async function getUserOrganizationMembership(
