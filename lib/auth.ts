@@ -16,7 +16,6 @@ import {
   authAccessControl,
   organizationRoles,
 } from "@/lib/permissions";
-import { sendPasswordResetEmail } from "@/lib/email/send-password-reset";
 import {
   seedSystemGlobalRoles,
   syncAllGlobalRolesToOrg,
@@ -26,6 +25,16 @@ const authOptions = {
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  user: {
+    additionalFields: {
+      mustChangePassword: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+    },
+  },
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET,
   emailAndPassword: {
@@ -33,15 +42,7 @@ const authOptions = {
     autoSignIn: true,
     minPasswordLength: 6,
     maxPasswordLength: 256,
-    resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
-    sendResetPassword: async ({ user, url }) => {
-      await sendPasswordResetEmail({
-        to: user.email,
-        name: user.name,
-        url,
-      });
-    },
   },
   trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:3000"],
   advanced: {
@@ -130,12 +131,18 @@ export const auth = betterAuth({
   plugins: [
     ...(authOptions.plugins ?? []),
     customSession(async ({ user, session }) => {
-      const organizationCtx = await getSessionOrganizationContext(
-        user.id,
-        session.activeOrganizationId,
-      );
+      const [organizationCtx, passwordState] = await Promise.all([
+        getSessionOrganizationContext(user.id, session.activeOrganizationId),
+        prisma.user.findUnique({
+          where: { id: user.id },
+          select: { mustChangePassword: true },
+        }),
+      ]);
       return {
-        user,
+        user: {
+          ...user,
+          mustChangePassword: passwordState?.mustChangePassword ?? false,
+        },
         session,
         organization: organizationCtx,
       };

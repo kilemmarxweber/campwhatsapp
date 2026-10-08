@@ -12,9 +12,10 @@ import {
 } from "@/lib/auth/governance-rules";
 import { promoteTenantRole } from "@/lib/auth/org-membership";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
-import { randomBytes } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { sendMemberCreatedEmail } from "@/lib/email/send-member-created";
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset";
+import { sendProfileUpdatedEmail } from "@/lib/email/send-profile-updated";
 import { generateSecurePassword } from "@/lib/generate-password";
 import { ORG_ROLE, APP_ROLE, isOwnerOrgRole } from "@/lib/permissions";
 import {
@@ -204,7 +205,7 @@ export async function createSuccursaleMember(input: {
     userId = created.user.id;
     await prisma.user.update({
       where: { id: userId },
-      data: { emailVerified: true },
+      data: { emailVerified: true, mustChangePassword: true },
     });
   }
 
@@ -323,14 +324,6 @@ export async function removeMember(input: {
   revalidatePath(`/o/${input.orgSlug}/equipe`);
 }
 
-function appBaseUrl() {
-  return (
-    process.env.BETTER_AUTH_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "http://localhost:3000"
-  ).replace(/\/$/, "");
-}
-
 function assertAssignableRole(role: string) {
   if (isOwnerOrgRole(role)) {
     throw new Error("Le rôle propriétaire ne peut pas être assigné");
@@ -389,6 +382,21 @@ export async function updateSuccursaleMember(input: {
     data: { name, email },
   });
 
+  const branch = await prisma.organization.findUnique({
+    where: { id: input.organizationId },
+    select: { name: true },
+  });
+  try {
+    await sendProfileUpdatedEmail({
+      to: email,
+      name,
+      branchName: branch?.name,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "envoi impossible";
+    throw new Error(`Membre mis à jour, mais l'email n'a pas été envoyé (${detail})`);
+  }
+
   if (member.role !== nextRole) {
     await prisma.member.update({
       where: { id: member.id },
@@ -411,21 +419,47 @@ export async function resetMemberPassword(input: {
   });
 
   const member = await findBranchMember(input.organizationId, input.memberId);
-  const ctx = await auth.$context;
-  const token = randomBytes(18).toString("base64url");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-  await ctx.internalAdapter.createVerificationValue({
-    value: member.user.id,
-    identifier: `reset-password:${token}`,
-    expiresAt,
+  const temporaryPassword = generateSecurePassword(16);
+  const hashed = await hashPassword(temporaryPassword);
+  const account = await prisma.account.findFirst({
+    where: { userId: member.user.id, providerId: "credential" },
+    select: { id: true },
   });
-  const redirectTo = `${appBaseUrl()}/auth/reset-password`;
-  const url = `${ctx.baseURL}/reset-password/${token}?callbackURL=${encodeURIComponent(redirectTo)}`;
+  if (account) {
+    await prisma.account.update({
+      where: { id: account.id },
+      data: { password: hashed },
+    });
+  } else {
+    const now = new Date();
+    await prisma.account.create({
+      data: {
+        id: crypto.randomUUID().replace(/-/g, ""),
+        accountId: member.user.id,
+        providerId: "credential",
+        userId: member.user.id,
+        password: hashed,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  }
+  await prisma.user.update({
+    where: { id: member.user.id },
+    data: { mustChangePassword: true },
+  });
+  await prisma.session.deleteMany({ where: { userId: member.user.id } });
+
+  const branch = await prisma.organization.findUnique({
+    where: { id: input.organizationId },
+    select: { name: true },
+  });
   try {
     await sendPasswordResetEmail({
       to: member.user.email,
       name: member.user.name,
-      url,
+      temporaryPassword,
+      branchName: branch?.name,
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "envoi impossible";

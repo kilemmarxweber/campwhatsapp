@@ -1,21 +1,15 @@
 import { sendMail } from "@/lib/email/mailer";
+import {
+  DEFAULT_APP_NAME,
+  emailInfoCard,
+  emailLayoutHtml,
+  emailLink,
+  emailSecretValue,
+  escapeHtml,
+  getSignInUrl,
+} from "@/lib/email/email-layout";
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function signInUrl() {
-  const base = (
-    process.env.BETTER_AUTH_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "http://localhost:3000"
-  ).replace(/\/$/, "");
-  return `${base}/auth/sign-in`;
-}
+const APP_NAME = DEFAULT_APP_NAME;
 
 export async function sendMemberCreatedEmail(input: {
   to: string;
@@ -25,45 +19,71 @@ export async function sendMemberCreatedEmail(input: {
   roleLabel: string;
   temporaryPassword?: string;
 }) {
-  const loginUrl = signInUrl();
-  const passwordLine = input.temporaryPassword
-    ? `Mot de passe temporaire : ${input.temporaryPassword}`
-    : "Connectez-vous avec votre mot de passe habituel.";
-  const subject = `Votre compte — ${input.branchName}`;
+  const loginUrl = getSignInUrl();
+  const hello = `Bonjour ${input.name.trim() || input.to}`;
+  const subject = `Votre compte — ${APP_NAME}`;
+  const introText = input.temporaryPassword
+    ? `${hello}, un compte a été créé pour vous sur ${APP_NAME}, en tant que ${input.roleLabel} à ${input.branchName} (${input.organizationName}).`
+    : `${hello}, vous avez été ajouté comme ${input.roleLabel} à ${input.branchName} (${input.organizationName}).`;
+
   const text = [
-    `Bonjour ${input.name},`,
+    hello,
     "",
-    `Un compte a été créé pour vous sur la succursale ${input.branchName} (${input.organizationName}).`,
-    `Rôle : ${input.roleLabel}`,
+    introText,
+    "",
     `Email : ${input.to}`,
-    passwordLine,
+    `Rôle : ${input.roleLabel}`,
+    `Organisation : ${input.organizationName}`,
+    `Succursale : ${input.branchName}`,
+    input.temporaryPassword
+      ? `Mot de passe temporaire : ${input.temporaryPassword}`
+      : "Connectez-vous avec votre mot de passe habituel.",
     "",
     `Connexion : ${loginUrl}`,
     "",
     input.temporaryPassword
-      ? "Changez ce mot de passe après votre première connexion."
+      ? "Remplacez ce mot de passe dès votre première connexion."
       : "",
+    "",
+    `L'équipe ${APP_NAME}`,
   ]
-    .filter(Boolean)
+    .filter((line) => line !== "")
     .join("\n");
 
-  const passwordHtml = input.temporaryPassword
-    ? `<tr><td style="padding:6px 0;color:#5c6b84;">Mot de passe temporaire</td><td style="padding:6px 0;font-family:ui-monospace,monospace;">${escapeHtml(input.temporaryPassword)}</td></tr>`
-    : `<tr><td colspan="2" style="padding:6px 0;">Connectez-vous avec votre mot de passe habituel.</td></tr>`;
+  const rows = [
+    { label: "Email", valueHtml: escapeHtml(input.to) },
+    { label: "Rôle", valueHtml: escapeHtml(input.roleLabel) },
+    { label: "Organisation", valueHtml: escapeHtml(input.organizationName) },
+    { label: "Succursale", valueHtml: escapeHtml(input.branchName) },
+    input.temporaryPassword
+      ? {
+          label: "Mot de passe temporaire",
+          valueHtml: emailSecretValue(input.temporaryPassword),
+        }
+      : {
+          label: "Mot de passe",
+          valueHtml: "Utilisez votre mot de passe habituel.",
+        },
+    { label: "Connexion", valueHtml: emailLink(loginUrl, "Se connecter") },
+  ];
 
-  const html = `
-    <div style="font-family:Segoe UI,sans-serif;color:#121826;line-height:1.5;">
-      <p>Bonjour ${escapeHtml(input.name)},</p>
-      <p>Un compte a été créé pour vous sur la succursale <strong>${escapeHtml(input.branchName)}</strong> (${escapeHtml(input.organizationName)}).</p>
-      <table style="border-collapse:collapse;">
-        <tr><td style="padding:6px 12px 6px 0;color:#5c6b84;">Email</td><td>${escapeHtml(input.to)}</td></tr>
-        <tr><td style="padding:6px 12px 6px 0;color:#5c6b84;">Rôle</td><td>${escapeHtml(input.roleLabel)}</td></tr>
-        ${passwordHtml}
-      </table>
-      <p><a href="${escapeHtml(loginUrl)}">Se connecter</a></p>
-      ${input.temporaryPassword ? "<p style=\"color:#5c6b84;font-size:13px;\">Changez ce mot de passe après votre première connexion.</p>" : ""}
-    </div>
-  `;
+  const html = emailLayoutHtml({
+    appName: APP_NAME,
+    title: "Votre compte est prêt",
+    intro: escapeHtml(introText),
+    bodyHtml: `
+      ${emailInfoCard(rows)}
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#64748b;">
+        ${
+          input.temporaryPassword
+            ? "Remplacez ce mot de passe dès votre première connexion."
+            : "Connectez-vous avec votre mot de passe habituel."
+        }
+      </p>
+    `,
+    cta: { href: loginUrl, label: "Se connecter" },
+    branchContact: { name: input.branchName },
+  });
 
   await sendMail({ to: input.to, subject, text, html });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 const SIGN_IN = "/auth/sign-in";
 
@@ -30,10 +31,25 @@ export async function proxy(request: NextRequest) {
 
   const session = await auth.api.getSession({ headers: request.headers });
   const isAuthenticated = Boolean(session?.user);
+  const mustChangePassword = session?.user
+    ? Boolean(
+        (
+          await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { mustChangePassword: true },
+          })
+        )?.mustChangePassword,
+      )
+    : false;
+
+  if (mustChangePassword && pathname !== SIGN_IN) {
+    return NextResponse.redirect(new URL(SIGN_IN, request.url));
+  }
 
   if (
     isAuthPage(pathname) &&
     isAuthenticated &&
+    !mustChangePassword &&
     !pathname.startsWith("/auth/reset-password")
   ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

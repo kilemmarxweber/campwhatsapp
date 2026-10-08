@@ -1,38 +1,64 @@
 import { sendMail } from "@/lib/email/mailer";
+import {
+  DEFAULT_APP_NAME,
+  emailInfoCard,
+  emailLayoutHtml,
+  emailLink,
+  emailSecretValue,
+  escapeHtml,
+  getSignInUrl,
+} from "@/lib/email/email-layout";
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
+const APP_NAME = DEFAULT_APP_NAME;
 
 export async function sendPasswordResetEmail(input: {
   to: string;
   name: string;
-  url: string;
+  temporaryPassword: string;
+  branchName?: string;
 }) {
-  const subject = "Réinitialisation de votre mot de passe";
-  const greeting = input.name.trim() || input.to;
+  const loginUrl = getSignInUrl();
+  const hello = `Bonjour ${input.name.trim() || input.to}`;
+  const subject = `Mot de passe réinitialisé — ${APP_NAME}`;
+  const introText = `${hello}, un nouveau mot de passe temporaire a été défini pour votre compte ${APP_NAME}.`;
+  const note =
+    "À la première connexion, vous devrez remplacer ce mot de passe avant d'accéder à l'application.";
+
   const text = [
-    `Bonjour ${greeting},`,
+    hello,
     "",
-    "Une réinitialisation de mot de passe a été demandée pour votre compte.",
-    "Le lien est valable 1 heure :",
-    input.url,
+    introText,
     "",
-    "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.",
+    `Email : ${input.to}`,
+    `Nouveau mot de passe : ${input.temporaryPassword}`,
+    "",
+    `Connexion : ${loginUrl}`,
+    "",
+    note,
+    "",
+    `L'équipe ${APP_NAME}`,
   ].join("\n");
 
-  const html = `
-    <div style="font-family:Segoe UI,sans-serif;color:#121826;line-height:1.5;">
-      <p>Bonjour ${escapeHtml(greeting)},</p>
-      <p>Une réinitialisation de mot de passe a été demandée pour votre compte.</p>
-      <p><a href="${escapeHtml(input.url)}">Choisir un nouveau mot de passe</a></p>
-      <p style="color:#5c6b84;font-size:13px;">Ce lien est valable 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
-    </div>
-  `;
+  const html = emailLayoutHtml({
+    appName: APP_NAME,
+    title: "Mot de passe réinitialisé",
+    intro: escapeHtml(introText),
+    bodyHtml: `
+      ${emailInfoCard([
+        { label: "Email", valueHtml: escapeHtml(input.to) },
+        {
+          label: "Nouveau mot de passe",
+          valueHtml: emailSecretValue(input.temporaryPassword),
+        },
+        { label: "Connexion", valueHtml: emailLink(loginUrl, "Se connecter") },
+      ])}
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#64748b;">
+        ${escapeHtml(note)}
+      </p>
+    `,
+    cta: { href: loginUrl, label: "Se connecter" },
+    branchContact: input.branchName ? { name: input.branchName } : undefined,
+  });
 
   await sendMail({ to: input.to, subject, text, html });
 }

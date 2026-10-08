@@ -15,6 +15,8 @@ export function AppHeader({
   showSiegeLink = false,
   showOrganisationsLink = false,
   contextLabel,
+  brand = "Campagnes",
+  menuLabels,
 }: {
   title: string;
   subtitle?: string;
@@ -24,6 +26,13 @@ export function AppHeader({
   showSiegeLink?: boolean;
   showOrganisationsLink?: boolean;
   contextLabel?: string;
+  brand?: string;
+  menuLabels?: {
+    organisations: string;
+    branches: string;
+    siege: string;
+    signOut: string;
+  };
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 shadow-[0_1px_0_0_var(--border),0_8px_24px_-12px_color-mix(in_oklab,var(--tvs-blue)_28%,transparent)] backdrop-blur-md">
@@ -37,7 +46,7 @@ export function AppHeader({
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <div className="flex min-w-0 items-center gap-4">
           <Link href={homeHref} className="brand-mark shrink-0 text-base uppercase">
-            Campagnes
+            {brand}
           </Link>
           <Separator orientation="vertical" className="hidden h-8 sm:block" />
           <div className="min-w-0">
@@ -56,6 +65,7 @@ export function AppHeader({
           showSiegeLink={showSiegeLink}
           showOrganisationsLink={showOrganisationsLink}
           contextLabel={contextLabel}
+          menuLabels={menuLabels}
         />
       </div>
       {navItems && navItems.length > 0 ? (

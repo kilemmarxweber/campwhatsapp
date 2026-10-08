@@ -18,6 +18,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   role          String?
+  mustChangePassword Boolean @default(false)
   banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
@@ -104,10 +105,14 @@ model Organization {
 
 /// Organisation cliente parente; Organization représente une succursale Better Auth.
 model TenantOrganization {
-  id        String          @id @default(cuid())
-  name      String
-  slug      String          @unique
-  createdAt DateTime        @default(now())
+  id         String          @id @default(cuid())
+  name       String
+  slug       String          @unique
+  colorRed   String          @default("#dc4226")
+  colorWhite String          @default("#ffffff")
+  colorBlue  String          @default("#253c80")
+  locale     String          @default("fr")
+  createdAt  DateTime        @default(now())
   branches  Organization[]
   members   TenantMember[]
 

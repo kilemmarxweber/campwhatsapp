@@ -393,8 +393,8 @@ function MemberActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Réinitialiser le mot de passe ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Un email de réinitialisation sera envoyé à {member.user.email}. Le lien
-              est valable 1 heure.
+              Un mot de passe temporaire sera envoyé à {member.user.email}. À la
+              première connexion, il devra le remplacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

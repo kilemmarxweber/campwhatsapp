@@ -40,11 +40,18 @@ export function UserProfileMenu({
   showSiegeLink = false,
   showOrganisationsLink = false,
   contextLabel,
+  menuLabels,
 }: {
   user: ProfileUser;
   showSiegeLink?: boolean;
   showOrganisationsLink?: boolean;
   contextLabel?: string;
+  menuLabels?: {
+    organisations: string;
+    branches: string;
+    siege: string;
+    signOut: string;
+  };
 }) {
   const router = useRouter();
 
@@ -100,18 +107,18 @@ export function UserProfileMenu({
           {showOrganisationsLink ? (
             <DropdownMenuItem render={<Link href="/organisations" />}>
               <LayoutDashboardIcon />
-              Organisations
+              {menuLabels?.organisations ?? "Organisations"}
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem render={<Link href="/dashboard" />}>
               <LayoutDashboardIcon />
-              Mes succursales
+              {menuLabels?.branches ?? "Mes succursales"}
             </DropdownMenuItem>
           )}
           {showSiegeLink ? (
             <DropdownMenuItem render={<Link href="/admin" />}>
               <ShieldIcon />
-              Administration siège
+              {menuLabels?.siege ?? "Administration siège"}
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuGroup>
@@ -126,7 +133,7 @@ export function UserProfileMenu({
             }}
           >
             <LogOutIcon />
-            Déconnexion
+            {menuLabels?.signOut ?? "Déconnexion"}
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
