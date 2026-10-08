@@ -25,28 +25,33 @@ import {
 
 export async function createTenantOrganization(input: { name: string; slug: string }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non authentifié");
+  if (!session?.user) return { ok: false as const, message: "Non authentifié" };
   const access = await getGovernanceContext(session.user.id, session.user.role);
   if (!canCreateOrganization(access?.level ?? null)) {
-    throw new Error("Seul le propriétaire peut créer une organisation");
+    return { ok: false as const, message: "Seul le propriétaire peut créer une organisation" };
   }
 
   const name = input.name.trim();
   const slug = input.slug.trim().toLowerCase();
-  if (!name || !slug) throw new Error("Nom et slug requis");
+  if (!name || !slug) return { ok: false as const, message: "Nom et slug requis" };
   const existing = await prisma.tenantOrganization.findUnique({ where: { slug } });
-  if (existing) throw new Error("Ce slug d'organisation existe déjà");
+  if (existing) return { ok: false as const, message: "Ce slug d'organisation existe déjà" };
 
-  const tenant = await prisma.tenantOrganization.create({ data: { name, slug } });
-  await prisma.tenantMember.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    create: { tenantId: tenant.id, userId: session.user.id, role: TENANT_ROLE.OWNER },
-    update: { role: TENANT_ROLE.OWNER },
-  });
+  try {
+    const tenant = await prisma.tenantOrganization.create({ data: { name, slug } });
+    await prisma.tenantMember.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+      create: { tenantId: tenant.id, userId: session.user.id, role: TENANT_ROLE.OWNER },
+      update: { role: TENANT_ROLE.OWNER },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Création impossible";
+    return { ok: false as const, message };
+  }
 
   revalidatePath("/organisations");
   revalidatePath("/dashboard");
-  return tenant;
+  return { ok: true as const };
 }
 
 export async function createSuccursale(input: {

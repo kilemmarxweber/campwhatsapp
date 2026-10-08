@@ -56,18 +56,18 @@ export function AddOrganizationButton() {
           onSubmit={(event) => {
             event.preventDefault();
             startTransition(async () => {
-              try {
-                await createTenantOrganization({
-                  name,
-                  slug: slug || slugify(name),
-                });
-                toast.success("Organisation créée");
-                reset();
-                setOpen(false);
-                router.refresh();
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+              const result = await createTenantOrganization({
+                name,
+                slug: slug || slugify(name),
+              });
+              if (!result.ok) {
+                toast.error(result.message);
+                return;
               }
+              toast.success("Organisation créée");
+              reset();
+              setOpen(false);
+              router.refresh();
             });
           }}
         >

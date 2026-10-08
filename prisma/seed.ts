@@ -1,6 +1,7 @@
 /**
  * Seed démo TVS Motors — contacts, médias, templates, campagnes.
- * Compte : demo@tvsrdcongo.com / demo1234
+ * Owner  : kilemmarxweber@gmail.com (rôle app admin, owner de l’org)
+ * Démo   : demo@tvsrdcongo.com / demo1234
  * Org    : tvs-rdc
  */
 import "dotenv/config";
@@ -14,6 +15,9 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 });
 
+const OWNER_EMAIL = "kilemmarxweber@gmail.com";
+const OWNER_PASSWORD = "K@#&ndoy";
+const OWNER_NAME = "kilemmarxweber";
 const DEMO_EMAIL = "demo@tvsrdcongo.com";
 const DEMO_PASSWORD = "demo1234";
 const ORG_SLUG = "tvs-rdc";
@@ -40,6 +44,62 @@ function id() {
   return randomUUID().replace(/-/g, "").slice(0, 24);
 }
 
+async function ensureCredential(
+  userId: string,
+  password: string,
+) {
+  const hashed = await hashPassword(password);
+  const account = await prisma.account.findFirst({
+    where: { userId, providerId: "credential" },
+  });
+  if (!account) {
+    await prisma.account.create({
+      data: {
+        id: id(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: hashed,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    return;
+  }
+  await prisma.account.update({
+    where: { id: account.id },
+    data: { password: hashed },
+  });
+}
+
+/** Compte owner par défaut : admin applicatif, owner de l’organisation seed. */
+async function ensureOwnerUser() {
+  let user = await prisma.user.findUnique({ where: { email: OWNER_EMAIL } });
+  if (!user) {
+    const userId = id();
+    user = await prisma.user.create({
+      data: {
+        id: userId,
+        name: OWNER_NAME,
+        email: OWNER_EMAIL,
+        emailVerified: true,
+        role: "admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    console.log(`✓ Owner créé : ${OWNER_EMAIL}`);
+  } else {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: "admin", emailVerified: true, name: user.name || OWNER_NAME },
+    });
+    console.log(`· Owner existant, rôle admin confirmé : ${OWNER_EMAIL}`);
+  }
+  await ensureCredential(user.id, OWNER_PASSWORD);
+  return user;
+}
+
 async function ensureUser() {
   let user = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
   if (!user) {
@@ -55,17 +115,7 @@ async function ensureUser() {
         updatedAt: new Date(),
       },
     });
-    await prisma.account.create({
-      data: {
-        id: id(),
-        accountId: userId,
-        providerId: "credential",
-        userId,
-        password: await hashPassword(DEMO_PASSWORD),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
+    await ensureCredential(userId, DEMO_PASSWORD);
     console.log(`✓ User créé : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
   } else {
     console.log(`· User existant : ${DEMO_EMAIL}`);
@@ -103,29 +153,44 @@ async function ensureOrg(userId: string) {
     });
   }
 
+  await linkMember(org.id, tenant.id, userId, "owner");
+
+  return { org, tenant };
+}
+
+async function linkMember(
+  organizationId: string,
+  tenantId: string,
+  userId: string,
+  role: "owner" | "admin" | "user",
+) {
   const member = await prisma.member.findFirst({
-    where: { organizationId: org.id, userId },
+    where: { organizationId, userId },
   });
   if (!member) {
     await prisma.member.create({
       data: {
         id: id(),
-        organizationId: org.id,
+        organizationId,
         userId,
-        role: "owner",
+        role,
         createdAt: new Date(),
       },
     });
-    console.log("✓ Membre owner lié");
+    console.log(`✓ Membre ${role} lié`);
+  } else if (member.role !== role) {
+    await prisma.member.update({
+      where: { id: member.id },
+      data: { role },
+    });
+    console.log(`✓ Membre passé en ${role}`);
   }
 
   await prisma.tenantMember.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId } },
-    create: { tenantId: tenant.id, userId, role: "owner" },
-    update: {},
+    where: { tenantId_userId: { tenantId, userId } },
+    create: { tenantId, userId, role },
+    update: { role },
   });
-
-  return org;
 }
 
 async function seedContacts(organizationId: string) {
@@ -442,8 +507,10 @@ async function seedCampaigns(
 
 async function main() {
   console.log("── Seed TVS Campagnes ──");
+  const owner = await ensureOwnerUser();
   const user = await ensureUser();
-  const org = await ensureOrg(user.id);
+  const { org, tenant } = await ensureOrg(user.id);
+  await linkMember(org.id, tenant.id, owner.id, "owner");
   const contacts = await seedContacts(org.id);
   const media = await seedMedia(org.id);
   await seedTemplates(org.id, media);
@@ -453,7 +520,8 @@ async function main() {
   );
   await seedCampaigns(org.id, contacts, media, list.id);
   console.log("── Terminé ──");
-  console.log(`Connexion : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+  console.log(`Owner    : ${OWNER_EMAIL} / ${OWNER_PASSWORD}`);
+  console.log(`Démo     : ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
   console.log(`Espace org : /o/${ORG_SLUG}`);
 }
 
