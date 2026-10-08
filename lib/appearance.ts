@@ -43,7 +43,9 @@ export function isHexColor(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value.trim());
 }
 
-export function normalizeAppearance(input?: Partial<OrgAppearance> | null): OrgAppearance {
+export function normalizeAppearance(
+  input?: (Partial<Omit<OrgAppearance, "locale">> & { locale?: string | null }) | null,
+): OrgAppearance {
   const red = input?.colorRed?.trim() ?? "";
   const white = input?.colorWhite?.trim() ?? "";
   const blue = input?.colorBlue?.trim() ?? "";
