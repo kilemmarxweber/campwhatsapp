@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
-import { getKlamboClient } from "@/lib/klambo/org";
+import { getKlamboClientForBranch } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { readUploadBuffer } from "@/lib/upload-file.server";
+import { processSmsCampaign } from "@/lib/sms/process";
 
 function contactVars(contact: {
   name: string | null;
@@ -51,15 +52,8 @@ export async function processCampaign(campaignId: string) {
   if (!campaign) throw new Error("Campagne introuvable");
   if (campaign.status === "cancelled") return;
   if (campaign.channel === "sms") {
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: "failed", completedAt: new Date() },
-    });
-    await prisma.campaignRecipient.updateMany({
-      where: { campaignId, status: { in: ["pending", "queued", "failed"] } },
-      data: { status: "failed", error: "L'envoi SMS n'est pas encore configuré." },
-    });
-    throw new Error("L'envoi SMS n'est pas encore configuré.");
+    await processSmsCampaign(campaignId);
+    return;
   }
 
   await prisma.campaign.update({
@@ -67,7 +61,7 @@ export async function processCampaign(campaignId: string) {
     data: { status: "sending", startedAt: new Date() },
   });
 
-  const { client } = await getKlamboClient();
+  const { client } = await getKlamboClientForBranch(campaign.organizationId);
 
   let klamboMediaId = campaign.media?.klamboMediaId ?? null;
 

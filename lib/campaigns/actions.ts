@@ -8,7 +8,8 @@ import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-
 import { enqueueCampaign } from "@/lib/campaigns/process";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { writeOrgUpload, resolveUploadAbsolutePath } from "@/lib/upload-file.server";
-import { getKlamboClient } from "@/lib/klambo/org";
+import { getKlamboClientForBranch } from "@/lib/klambo/org";
+import { isTwilioSmsConfiguredForBranch } from "@/lib/sms/config";
 import fs from "fs/promises";
 
 async function resolveCampaignContent(input: {
@@ -155,8 +156,13 @@ export async function createCampaign(input: {
     await requireOrganizationPermission(input.organizationId, {
       campaigns: ["send"],
     });
-    if (content.channel === "sms") {
-      throw new Error("L'envoi SMS n'est pas encore configuré. La campagne reste enregistrée en brouillon.");
+    if (
+      content.channel === "sms" &&
+      !(await isTwilioSmsConfiguredForBranch(input.organizationId))
+    ) {
+      throw new Error(
+        "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio. La campagne reste en brouillon.",
+      );
     }
     await prisma.campaign.update({
       where: { id: campaign.id },
@@ -185,8 +191,13 @@ export async function startCampaign(input: {
     },
   });
   if (!campaign) throw new Error("Campagne introuvable");
-  if (campaign.channel === "sms") {
-    throw new Error("L'envoi SMS n'est pas encore configuré.");
+  if (
+    campaign.channel === "sms" &&
+    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+  ) {
+    throw new Error(
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+    );
   }
   if (campaign.status === "sending") {
     return campaign;
@@ -233,7 +244,14 @@ export async function retryFailedRecipients(input: {
     where: { id: input.campaignId, organizationId: input.organizationId },
   });
   if (!campaign) throw new Error("Campagne introuvable");
-  if (campaign.channel === "sms") throw new Error("L'envoi SMS n'est pas encore configuré.");
+  if (
+    campaign.channel === "sms" &&
+    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+  ) {
+    throw new Error(
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+    );
+  }
 
   await prisma.campaignRecipient.updateMany({
     where: { campaignId: input.campaignId, status: "failed" },
@@ -268,7 +286,14 @@ export async function resendCampaign(input: {
     },
   });
   if (!campaign) throw new Error("Campagne introuvable");
-  if (campaign.channel === "sms") throw new Error("L'envoi SMS n'est pas encore configuré.");
+  if (
+    campaign.channel === "sms" &&
+    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+  ) {
+    throw new Error(
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+    );
+  }
   if (campaign.status === "sending") {
     throw new Error("La campagne est déjà en cours d'envoi");
   }
@@ -462,7 +487,7 @@ export async function uploadMediaAsset(input: {
 
   let klamboMediaId: string | null = null;
   try {
-    const { client } = await getKlamboClient();
+    const { client } = await getKlamboClientForBranch(input.organizationId);
     try {
       const registered = await client.registerMedia({
         relative_path: relativePath.replace(/\\/g, "/"),

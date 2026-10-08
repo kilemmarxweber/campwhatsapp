@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { KlamboClient } from "@/lib/klambo/client";
-import { KLAMBO_CONFIG_ID } from "@/lib/klambo/org";
 
 const WEBHOOK_EVENTS = [
   "message.sent",
@@ -9,7 +8,11 @@ const WEBHOOK_EVENTS = [
   "message.failed",
 ];
 
-export async function registerKlamboWebhook(apiKey: string, baseUrl: string) {
+export async function registerKlamboWebhook(
+  tenantId: string,
+  apiKey: string,
+  baseUrl: string,
+) {
   const appUrl =
     process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_BETTER_AUTH_URL;
   if (!appUrl || appUrl.includes("localhost")) {
@@ -21,7 +24,7 @@ export async function registerKlamboWebhook(apiKey: string, baseUrl: string) {
     const result = await client.registerWebhook(webhookUrl, WEBHOOK_EVENTS);
     if (result.secret) {
       await prisma.klamboConfig.update({
-        where: { id: KLAMBO_CONFIG_ID },
+        where: { tenantId },
         data: { webhookSecret: result.secret },
       });
     }

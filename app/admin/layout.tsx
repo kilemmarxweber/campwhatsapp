@@ -31,6 +31,7 @@ export default async function AdminLayout({
         navItems={[
           { href: "/admin", label: "Vue d'ensemble" },
           { href: "/admin/klambo", label: "WhatsApp" },
+          { href: "/admin/sms", label: "SMS" },
           { href: "/admin/roles", label: "Rôles" },
           { href: "/organisations", label: "Organisations" },
         ]}

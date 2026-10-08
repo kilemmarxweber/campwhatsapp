@@ -1,33 +1,21 @@
+import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { decryptSecret, maskApiKey } from "@/lib/crypto";
-import { getKlamboDefaults } from "@/lib/klambo/env";
-import { KlamboSettingsForm } from "@/components/klambo-settings-form";
 
 export default async function AdminKlamboPage() {
-  const row = await prisma.klamboConfig.findUnique({
-    where: { id: "default" },
+  const tenants = await prisma.tenantOrganization.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      klambo: { select: { id: true } },
+      branches: {
+        orderBy: { name: "asc" },
+        take: 1,
+        select: { slug: true, name: true },
+      },
+      _count: { select: { branches: true } },
+    },
   });
-  const defaults = getKlamboDefaults();
-
-  let apiKey = "";
-  let apiKeyMasked: string | null = null;
-  let apiKeyCorrupt = false;
-  if (row?.apiKeyEnc) {
-    try {
-      apiKey = decryptSecret(row.apiKeyEnc);
-      apiKeyMasked = maskApiKey(apiKey);
-    } catch {
-      apiKey = "";
-      apiKeyMasked = null;
-      apiKeyCorrupt = true;
-    }
-  }
-
-  const appUrl =
-    process.env.BETTER_AUTH_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "http://localhost:3000";
-  const webhookEndpoint = `${appUrl.replace(/\/$/, "")}/api/webhooks/klambo`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,27 +24,80 @@ export default async function AdminKlamboPage() {
           WhatsApp
         </h1>
         <p className="mt-1 text-[var(--fg-muted)]">
-          Connexion Klambo partagée par toutes les succursales.
+          Chaque organisation a sa clé Klambo. On la saisit une fois dans les
+          paramètres d&apos;une succursale, pour toutes les autres.
         </p>
       </div>
-      {apiKeyCorrupt ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-          La clé API enregistrée ne peut plus être déchiffrée (secret
-          d&apos;encryption modifié). Collez à nouveau la clé Klambo et
-          enregistrez.
-        </p>
-      ) : null}
-      <KlamboSettingsForm
-        webhookEndpoint={webhookEndpoint}
-        initial={{
-          apiKey,
-          apiKeyMasked,
-          baseUrl: row?.baseUrl ?? defaults.baseUrl,
-          defaultCountry: row?.defaultCountry ?? defaults.defaultCountry,
-          hasWebhookSecret: Boolean(row?.webhookSecret),
-          configured: Boolean(apiKey) && !apiKeyCorrupt,
-        }}
+      <TenantChannelList
+        tenants={tenants.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+          configured: Boolean(tenant.klambo),
+          branchCount: tenant._count.branches,
+          href: tenant.branches[0]
+            ? `/o/${tenant.branches[0].slug}/settings#whatsapp`
+            : null,
+          detail: tenant.branches[0]?.name,
+        }))}
+        empty="Aucune organisation."
       />
     </div>
+  );
+}
+
+function TenantChannelList({
+  tenants,
+  empty,
+}: {
+  tenants: Array<{
+    id: string;
+    name: string;
+    configured: boolean;
+    branchCount: number;
+    href: string | null;
+    detail?: string;
+  }>;
+  empty: string;
+}) {
+  if (tenants.length === 0) {
+    return <p className="surface p-6 text-sm text-[var(--fg-muted)]">{empty}</p>;
+  }
+  return (
+    <ul className="surface divide-y divide-[var(--border)]">
+      {tenants.map((tenant) => {
+        const body = (
+          <>
+            <div>
+              <p className="font-medium text-[var(--tvs-blue-deep)]">{tenant.name}</p>
+              <p className="text-sm text-[var(--fg-muted)]">
+                {tenant.branchCount === 1
+                  ? "1 succursale"
+                  : `${tenant.branchCount} succursales`}
+                {tenant.detail ? ` · ${tenant.detail}` : ""}
+              </p>
+            </div>
+            <span className={tenant.configured ? "badge badge-ok" : "badge badge-warn"}>
+              {tenant.configured ? "Connecté" : "À configurer"}
+            </span>
+          </>
+        );
+        return (
+          <li key={tenant.id}>
+            {tenant.href ? (
+              <Link
+                href={tenant.href}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-[var(--tvs-blue-soft)]"
+              >
+                {body}
+              </Link>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                {body}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

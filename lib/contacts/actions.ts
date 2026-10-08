@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { CountryCode } from "libphonenumber-js";
 import prisma from "@/lib/prisma";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
+import { getDefaultCountryForBranch } from "@/lib/klambo/org";
 import { normalizePhone } from "@/lib/phone";
 import { parseContactsExcel } from "@/lib/contacts/import-excel";
 
@@ -19,13 +20,9 @@ export async function createContact(input: {
     contacts: ["create"],
   });
 
-  const settings = await prisma.klamboConfig.findUnique({
-    where: { id: "default" },
-    select: { defaultCountry: true },
-  });
   const phone = normalizePhone(
     input.phone,
-    (settings?.defaultCountry as CountryCode) || "CD",
+    (await getDefaultCountryForBranch(input.organizationId)) as CountryCode,
   );
   if (!phone) throw new Error("Numéro de téléphone invalide");
 
@@ -72,11 +69,9 @@ export async function importContactsFromExcel(input: {
     contacts: ["import"],
   });
 
-  const settings = await prisma.klamboConfig.findUnique({
-    where: { id: "default" },
-    select: { defaultCountry: true },
-  });
-  const country = (settings?.defaultCountry as CountryCode) || "CD";
+  const country = (await getDefaultCountryForBranch(
+    input.organizationId,
+  )) as CountryCode;
 
   const buffer = Buffer.from(input.base64, "base64");
   const rows = parseContactsExcel(buffer, country);

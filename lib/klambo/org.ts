@@ -3,24 +3,41 @@ import prisma from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { KlamboClient } from "@/lib/klambo/client";
 
-export const KLAMBO_CONFIG_ID = "default";
-
-export async function getKlamboConfig() {
+export async function getKlamboConfig(tenantId: string) {
   return prisma.klamboConfig.findUnique({
-    where: { id: KLAMBO_CONFIG_ID },
+    where: { tenantId },
   });
 }
 
-export async function isKlamboConfigured() {
-  const row = await getKlamboConfig();
+export async function isKlamboConfigured(tenantId: string) {
+  const row = await getKlamboConfig(tenantId);
   return Boolean(row?.apiKeyEnc);
 }
 
-export async function getKlamboClient() {
-  const settings = await getKlamboConfig();
+export async function isKlamboConfiguredForBranch(organizationId: string) {
+  const branch = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { tenantId: true },
+  });
+  if (!branch?.tenantId) return false;
+  return isKlamboConfigured(branch.tenantId);
+}
+
+export async function getDefaultCountryForBranch(organizationId: string) {
+  const branch = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { tenantId: true },
+  });
+  if (!branch?.tenantId) return "CD";
+  const row = await getKlamboConfig(branch.tenantId);
+  return row?.defaultCountry || "CD";
+}
+
+export async function getKlamboClient(tenantId: string) {
+  const settings = await getKlamboConfig(tenantId);
   if (!settings?.apiKeyEnc) {
     throw new Error(
-      "Clé API Klambo non configurée. Allez dans Siège → WhatsApp.",
+      "Clé API Klambo non configurée. Ouvrez Paramètres d'une succursale de cette organisation.",
     );
   }
   let apiKey: string;
@@ -28,9 +45,7 @@ export async function getKlamboClient() {
     apiKey = decryptSecret(settings.apiKeyEnc);
   } catch (err) {
     throw new Error(
-      err instanceof Error
-        ? err.message
-        : "Clé API Klambo illisible. Ré-enregistrez-la dans Siège → WhatsApp.",
+      "Clé API Klambo illisible. Ré-enregistrez-la dans Paramètres.",
       { cause: err },
     );
   }
@@ -41,9 +56,15 @@ export async function getKlamboClient() {
   };
 }
 
-/** @deprecated Use getKlamboClient — la clé est globale. */
-export async function getKlamboClientForOrg(_organizationId: string) {
-  return getKlamboClient();
+export async function getKlamboClientForBranch(organizationId: string) {
+  const branch = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { tenantId: true },
+  });
+  if (!branch?.tenantId) {
+    throw new Error("Succursale introuvable");
+  }
+  return getKlamboClient(branch.tenantId);
 }
 
 export function verifyKlamboSignature(

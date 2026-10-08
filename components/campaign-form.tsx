@@ -55,6 +55,7 @@ export function CampaignForm({
   media,
   lists,
   templates,
+  smsConfigured = false,
   initial,
 }: {
   organizationId: string;
@@ -64,6 +65,7 @@ export function CampaignForm({
   media: Media[];
   lists: List[];
   templates: Template[];
+  smsConfigured?: boolean;
   initial?: InitialCampaign;
 }) {
   const router = useRouter();
@@ -195,9 +197,13 @@ export function CampaignForm({
                 note,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
-                sendNow: channel === "whatsapp",
+                sendNow: channel === "whatsapp" || (channel === "sms" && smsConfigured),
               });
-              toast.success(channel === "sms" ? "Campagne SMS enregistrée en brouillon" : "Campagne lancée");
+              toast.success(
+                channel === "sms" && !smsConfigured
+                  ? "Campagne SMS enregistrée en brouillon"
+                  : "Campagne lancée",
+              );
               router.push(`/o/${orgSlug}/campaigns/${campaign.id}`);
             }
             router.refresh();
@@ -394,7 +400,7 @@ export function CampaignForm({
             : "Envoi…"
           : isEdit
             ? "Enregistrer"
-            : channel === "sms"
+            : channel === "sms" && !smsConfigured
               ? "Enregistrer le brouillon"
               : "Créer et envoyer"}
       </button>

@@ -113,8 +113,10 @@ model TenantOrganization {
   colorBlue  String          @default("#253c80")
   locale     String          @default("fr")
   createdAt  DateTime        @default(now())
-  branches  Organization[]
-  members   TenantMember[]
+  branches   Organization[]
+  members    TenantMember[]
+  klambo     KlamboConfig?
+  twilioSms  TwilioSmsConfig?
 
   @@map("tenant_organization")
 }
@@ -193,18 +195,35 @@ model Invitation {
   @@map("invitation")
 }
 
-// ─── Klambo (config globale siège) ─────────────────────────
+// ─── Klambo WhatsApp (un compte par organisation) ──────────
 
 model KlamboConfig {
-  id             String   @id @default("default")
+  id             String             @id @default(cuid())
+  tenantId       String             @unique
   apiKeyEnc      String
   webhookSecret  String?
-  baseUrl        String   @default("https://whatsapp-api.klambocore.com")
-  defaultCountry String   @default("CD")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  baseUrl        String             @default("https://whatsapp-api.klambocore.com")
+  defaultCountry String             @default("CD")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  tenant         TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("klambo_config")
+}
+
+// ─── Twilio SMS (un abonnement par organisation) ───────────
+
+model TwilioSmsConfig {
+  id           String             @id @default(cuid())
+  tenantId     String             @unique
+  accountSid   String
+  authTokenEnc String
+  fromNumber   String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  tenant       TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("twilio_sms_config")
 }
 
 // ─── Contacts ──────────────────────────────────────────────

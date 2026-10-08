@@ -1,10 +1,7 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
-import { isAppAdminRole } from "@/lib/permissions";
 import { isKlamboConfigured } from "@/lib/klambo/org";
 
 export default async function OrgHomePage({
@@ -16,14 +13,11 @@ export default async function OrgHomePage({
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
 
-  const session = await auth.api.getSession({ headers: await headers() });
-  const isSiege = isAppAdminRole(session?.user?.role);
-
   const [contacts, campaigns, media, klamboOk] = await Promise.all([
     prisma.contact.count({ where: { organizationId: org.id } }),
     prisma.campaign.count({ where: { organizationId: org.id } }),
     prisma.mediaAsset.count({ where: { organizationId: org.id } }),
-    isKlamboConfigured(),
+    org.tenant ? isKlamboConfigured(org.tenant.id) : Promise.resolve(false),
   ]);
 
   const recent = await prisma.campaign.findMany({
@@ -55,14 +49,12 @@ export default async function OrgHomePage({
             WhatsApp non configuré
           </p>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            La clé API Klambo doit être configurée au siège pour envoyer des
-            campagnes.
+            Enregistrez la clé Klambo dans les paramètres. Elle sert à toutes
+            les succursales de l&apos;organisation.
           </p>
-          {isSiege ? (
-            <Link href="/admin/klambo" className="btn btn-brand mt-3">
-              Configurer WhatsApp
-            </Link>
-          ) : null}
+          <Link href={`/o/${orgSlug}/settings#whatsapp`} className="btn btn-brand mt-3">
+            Configurer WhatsApp
+          </Link>
         </div>
       )}
 

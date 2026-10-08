@@ -59,7 +59,7 @@ export function decryptSecret(payload: string): string {
 
   throw new Error(
     "Impossible de déchiffrer le secret (ENCRYPTION_SECRET modifié ?). " +
-      "Ré-enregistrez la clé API dans Siège → WhatsApp.",
+      "Ré-enregistrez la clé API dans Paramètres de la succursale.",
     { cause: lastError },
   );
 }

@@ -19,6 +19,7 @@ export function CampaignActions({
   campaignId,
   status,
   channel = "whatsapp",
+  smsConfigured = false,
   failedCount,
 }: {
   organizationId: string;
@@ -26,11 +27,12 @@ export function CampaignActions({
   campaignId: string;
   status: string;
   channel?: "whatsapp" | "sms";
+  smsConfigured?: boolean;
   failedCount: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const smsPendingProvider = channel === "sms";
+  const smsPendingProvider = channel === "sms" && !smsConfigured;
   const canResend =
     !smsPendingProvider && ["completed", "cancelled", "failed"].includes(status);
   const canEdit = status !== "sending";
@@ -40,7 +42,7 @@ export function CampaignActions({
     <div className="flex flex-wrap gap-2">
       {smsPendingProvider ? (
         <p className="self-center text-sm text-[var(--fg-muted)]">
-          Envoi SMS en attente d’un fournisseur configuré.
+          Envoi SMS en attente du compte Twilio de cette organisation.
         </p>
       ) : null}
       {!smsPendingProvider && (status === "draft" || status === "failed") && (

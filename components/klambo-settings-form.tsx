@@ -7,9 +7,15 @@ import { toast } from "sonner";
 import { saveKlamboSettings } from "@/lib/klambo/actions";
 
 export function KlamboSettingsForm({
+  tenantId,
+  organizationId,
+  orgSlug,
   initial,
   webhookEndpoint,
 }: {
+  tenantId: string;
+  organizationId: string;
+  orgSlug: string;
   initial: {
     apiKey: string;
     apiKeyMasked: string | null;
@@ -76,11 +82,18 @@ export function KlamboSettingsForm({
           }
           startTransition(async () => {
             try {
-              await saveKlamboSettings({
+              const result = await saveKlamboSettings({
+                tenantId,
+                organizationId,
+                orgSlug,
                 apiKey: apiKey.trim(),
                 baseUrl,
                 defaultCountry,
               });
+              if (!result.ok) {
+                toast.error(result.message);
+                return;
+              }
               toast.success("Paramètres enregistrés");
               router.refresh();
             } catch (err) {
@@ -94,8 +107,8 @@ export function KlamboSettingsForm({
             Identifiants
           </h2>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            Une seule clé pour toutes les succursales. Utilisez l’œil pour
-            afficher ou masquer la valeur.
+            Clé WhatsApp de cette organisation, partagée par toutes ses
+            succursales. Utilisez l’œil pour afficher ou masquer la valeur.
           </p>
         </div>
 

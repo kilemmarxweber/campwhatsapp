@@ -5,6 +5,7 @@ import { CampaignActions } from "@/components/campaign-actions";
 import { CampaignLiveRefresh } from "@/components/campaign-live-refresh";
 import { MessageCardPreview } from "@/components/message-card-preview";
 import { renderTemplate } from "@/lib/campaigns/render-template";
+import { isTwilioSmsConfigured } from "@/lib/sms/config";
 
 export default async function CampaignDetailPage({
   params,
@@ -14,6 +15,9 @@ export default async function CampaignDetailPage({
   const { orgSlug, campaignId } = await params;
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
+  const smsConfigured = org.tenant
+    ? await isTwilioSmsConfigured(org.tenant.id)
+    : false;
 
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, organizationId: org.id },
@@ -65,6 +69,7 @@ export default async function CampaignDetailPage({
           campaignId={campaign.id}
           status={campaign.status}
           channel={campaign.channel}
+          smsConfigured={smsConfigured}
           failedCount={stats.failed}
         />
       </div>

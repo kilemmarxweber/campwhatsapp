@@ -50,7 +50,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, unmatched: true });
   }
 
-  const settings = await getKlamboConfig();
+  const branch = await prisma.organization.findUnique({
+    where: { id: recipient.campaign.organizationId },
+    select: { tenantId: true },
+  });
+  const settings = branch
+    ? await getKlamboConfig(branch.tenantId)
+    : null;
 
   if (settings?.webhookSecret) {
     const valid = verifyKlamboSignature(

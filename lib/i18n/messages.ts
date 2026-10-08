@@ -23,7 +23,7 @@ const dictionaries = {
       subtitle: "Réglages de l'organisation",
       whatsappTitle: "WhatsApp",
       whatsappBody:
-        "La connexion Klambo est gérée au siège pour toutes les succursales.",
+        "WhatsApp et SMS se configurent ici, une fois pour toute l'organisation.",
       connected: "Connecté",
       notConfigured: "Non configuré",
       openWhatsapp: "Ouvrir Siège → WhatsApp",
@@ -64,7 +64,8 @@ const dictionaries = {
       title: "Settings",
       subtitle: "Organisation preferences",
       whatsappTitle: "WhatsApp",
-      whatsappBody: "The Klambo connection is managed at head office for every branch.",
+      whatsappBody:
+        "WhatsApp and SMS are set here, once for the whole organisation.",
       connected: "Connected",
       notConfigured: "Not configured",
       openWhatsapp: "Open head office → WhatsApp",
@@ -106,7 +107,7 @@ const dictionaries = {
       subtitle: "Preferências da organização",
       whatsappTitle: "WhatsApp",
       whatsappBody:
-        "A ligação Klambo é gerida na sede para todas as sucursais.",
+        "WhatsApp e SMS configuram-se aqui, uma vez para toda a organização.",
       connected: "Ligado",
       notConfigured: "Não configurado",
       openWhatsapp: "Abrir sede → WhatsApp",
