@@ -50,6 +50,7 @@ type InitialCampaign = {
 export function CampaignForm({
   organizationId,
   orgSlug,
+  branchName,
   contacts,
   media,
   lists,
@@ -58,6 +59,7 @@ export function CampaignForm({
 }: {
   organizationId: string;
   orgSlug: string;
+  branchName: string;
   contacts: Contact[];
   media: Media[];
   lists: List[];
@@ -262,7 +264,7 @@ export function CampaignForm({
                 <>
                   <div className="mb-2 flex flex-wrap gap-2">
                     {templateOnlyVariables.map((key) => (
-                      <span key={key} className="badge">
+                      <span key={key} className="badge font-mono" style={{ textTransform: "none" }}>
                         {`{{${key}}}`}
                       </span>
                     ))}
@@ -317,15 +319,17 @@ export function CampaignForm({
           </div>
         </div>
 
-        {channel === "whatsapp" ? <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
-            Aperçu (template + note)
+            {channel === "sms" ? "Aperçu SMS" : "Aperçu WhatsApp"}
           </p>
           <MessageCardPreview
-            messageType={selectedTemplate?.messageType ?? "text"}
+            channel={channel}
+            brand={branchName}
+            messageType={channel === "sms" ? "text" : selectedTemplate?.messageType ?? "text"}
             caption={captionPreview}
             media={
-              selectedMedia?.storagePath
+              channel === "whatsapp" && selectedMedia?.storagePath
                 ? {
                     storagePath: selectedMedia.storagePath,
                     kind: selectedMedia.kind,
@@ -334,7 +338,14 @@ export function CampaignForm({
                 : null
             }
           />
-        </div> : <div className="surface p-4 text-sm text-[var(--fg-muted)]"><p>SMS : texte et liens uniquement. L’envoi sera disponible après configuration d’un fournisseur SMS.</p><pre className="mt-3 whitespace-pre-wrap font-sans">{captionPreview}</pre></div>}
+          {allMessageVariables.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {allMessageVariables.map((key) => (
+                <span key={key} className="badge font-mono" style={{ textTransform: "none" }}>{`{{${key}}}`}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="surface p-5">
@@ -383,7 +394,9 @@ export function CampaignForm({
             : "Envoi…"
           : isEdit
             ? "Enregistrer"
-            : "Créer et envoyer"}
+            : channel === "sms"
+              ? "Enregistrer le brouillon"
+              : "Créer et envoyer"}
       </button>
     </form>
   );

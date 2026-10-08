@@ -5,6 +5,7 @@ import {
   getOrganizationBySlug,
   requireOrgMembership,
 } from "@/lib/auth/organization-permission";
+import { getGovernanceLevel } from "@/lib/auth/governance";
 import { isAppAdminRole } from "@/lib/permissions";
 import { AppHeader } from "@/components/app-header";
 
@@ -36,15 +37,20 @@ export default async function OrgLayout({
     .catch(() => undefined);
 
   const isSiege = isAppAdminRole(session.user.role);
+  const governance = await getGovernanceLevel(session.user.id, session.user.role);
   const base = `/o/${orgSlug}`;
 
   return (
     <div className="min-h-screen">
       <AppHeader
         title={org.name}
-        subtitle="Succursale"
+        subtitle={org.tenant?.name ?? "Organisation"}
+        homeHref={governance ? "/organisations" : "/dashboard"}
+        showOrganisationsLink={Boolean(governance)}
         showSiegeLink={isSiege}
-        contextLabel={org.name}
+        contextLabel={
+          org.tenant ? `${org.tenant.name} · ${org.name}` : org.name
+        }
         user={{
           name: session.user.name,
           email: session.user.email,

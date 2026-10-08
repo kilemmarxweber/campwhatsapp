@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
+import { smsTemplateError } from "@/lib/campaigns/channel-rules";
 import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import { enqueueCampaign } from "@/lib/campaigns/process";
 import { renderTemplate } from "@/lib/campaigns/render-template";
@@ -24,9 +25,12 @@ async function resolveCampaignContent(input: {
     },
   });
   if (!template) throw new Error("Template introuvable");
-  if (template.channel === "sms" && template.messageType !== "text") {
-    throw new Error("Un modèle SMS doit être uniquement textuel");
-  }
+  const channelError = smsTemplateError({
+    channel: template.channel,
+    messageType: template.messageType,
+    mediaId: template.mediaId,
+  });
+  if (channelError) throw new Error(channelError);
 
   if (
     (template.messageType === "image" || template.messageType === "video") &&
@@ -44,10 +48,52 @@ async function resolveCampaignContent(input: {
 
   return {
     bodyTemplate,
-    messageType: template.messageType as "text" | "image" | "video",
+    messageType: (template.channel === "sms" ? "text" : template.messageType) as
+      | "text"
+      | "image"
+      | "video",
     channel: template.channel as "whatsapp" | "sms",
-    mediaId: template.mediaId,
+    mediaId: template.channel === "sms" ? null : template.mediaId,
   };
+}
+
+async function resolveCampaignAudience(input: {
+  organizationId: string;
+  contactListId?: string | null;
+  contactIds?: string[];
+}) {
+  let contactIds = input.contactIds ?? [];
+  if (input.contactListId) {
+    const list = await prisma.contactList.findFirst({
+      where: { id: input.contactListId, organizationId: input.organizationId },
+      select: { id: true },
+    });
+    if (!list) throw new Error("Liste introuvable");
+    const members = await prisma.contactListMember.findMany({
+      where: {
+        listId: list.id,
+        contact: { organizationId: input.organizationId },
+      },
+      select: { contactId: true },
+    });
+    contactIds = members.map((member) => member.contactId);
+  }
+
+  const uniqueIds = [...new Set(contactIds)];
+  if (uniqueIds.length === 0) {
+    throw new Error("Sélectionnez au moins un contact ou une liste");
+  }
+
+  const contacts = await prisma.contact.findMany({
+    where: {
+      organizationId: input.organizationId,
+      id: { in: uniqueIds },
+    },
+  });
+  if (contacts.length !== uniqueIds.length) {
+    throw new Error("Un ou plusieurs contacts n'appartiennent pas à cette succursale");
+  }
+  return contacts;
 }
 
 export async function createCampaign(input: {
@@ -74,24 +120,10 @@ export async function createCampaign(input: {
     channel: input.channel,
   });
 
-  let contactIds = input.contactIds ?? [];
-  if (input.contactListId) {
-    const members = await prisma.contactListMember.findMany({
-      where: { listId: input.contactListId },
-      select: { contactId: true },
-    });
-    contactIds = members.map((m) => m.contactId);
-  }
-
-  if (contactIds.length === 0) {
-    throw new Error("Sélectionnez au moins un contact ou une liste");
-  }
-
-  const contacts = await prisma.contact.findMany({
-    where: {
-      organizationId: input.organizationId,
-      id: { in: contactIds },
-    },
+  const contacts = await resolveCampaignAudience({
+    organizationId: input.organizationId,
+    contactListId: input.contactListId,
+    contactIds: input.contactIds,
   });
 
   const campaign = await prisma.campaign.create({
@@ -314,23 +346,10 @@ export async function updateCampaign(input: {
     channel: input.channel,
   });
 
-  let contactIds = input.contactIds ?? [];
-  if (input.contactListId) {
-    const members = await prisma.contactListMember.findMany({
-      where: { listId: input.contactListId },
-      select: { contactId: true },
-    });
-    contactIds = members.map((m) => m.contactId);
-  }
-  if (contactIds.length === 0) {
-    throw new Error("Sélectionnez au moins un contact ou une liste");
-  }
-
-  const contacts = await prisma.contact.findMany({
-    where: {
-      organizationId: input.organizationId,
-      id: { in: contactIds },
-    },
+  const contacts = await resolveCampaignAudience({
+    organizationId: input.organizationId,
+    contactListId: input.contactListId,
+    contactIds: input.contactIds,
   });
 
   await prisma.$transaction([
@@ -545,9 +564,12 @@ export async function createTemplate(input: {
 
   const messageType = input.messageType ?? "text";
   const channel = input.channel ?? "whatsapp";
-  if (channel === "sms" && messageType !== "text") {
-    throw new Error("Les modèles SMS acceptent uniquement du texte et des liens");
-  }
+  const channelError = smsTemplateError({
+    channel,
+    messageType,
+    mediaId: input.mediaId,
+  });
+  if (channelError) throw new Error(channelError);
   if (
     (messageType === "image" || messageType === "video") &&
     !input.mediaId
@@ -621,9 +643,12 @@ export async function updateTemplate(input: {
 
   const messageType = input.messageType ?? existing.messageType;
   const channel = input.channel ?? existing.channel;
-  if (channel === "sms" && messageType !== "text") {
-    throw new Error("Les modèles SMS acceptent uniquement du texte et des liens");
-  }
+  const channelError = smsTemplateError({
+    channel,
+    messageType,
+    mediaId: input.mediaId,
+  });
+  if (channelError) throw new Error(channelError);
   if (
     (messageType === "image" || messageType === "video") &&
     !input.mediaId
@@ -685,6 +710,11 @@ export async function deleteTemplate(input: {
   await requireOrganizationPermission(input.organizationId, {
     templates: ["delete"],
   });
-  await prisma.messageTemplate.delete({ where: { id: input.templateId } });
+  const existing = await prisma.messageTemplate.findFirst({
+    where: { id: input.templateId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Template introuvable");
+  await prisma.messageTemplate.delete({ where: { id: existing.id } });
   revalidatePath(`/o/${input.orgSlug}/templates`);
 }

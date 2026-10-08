@@ -14,10 +14,10 @@ export default async function AdminHomePage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold text-[var(--tvs-blue-deep)]">
-          Siège TVS
+          Siège
         </h1>
         <p className="mt-1 text-[var(--fg-muted)]">
-          Pilotage des succursales, WhatsApp, rôles et gouvernance.
+          Pilotage des succursales, WhatsApp, SMS, rôles et gouvernance.
         </p>
       </div>
 
@@ -54,8 +54,8 @@ export default async function AdminHomePage() {
         <Link href="/admin/klambo" className="btn btn-primary">
           Configurer WhatsApp
         </Link>
-        <Link href="/admin/succursales" className="btn btn-ghost">
-          Gérer les succursales
+        <Link href="/organisations" className="btn btn-ghost">
+          Organisations et succursales
         </Link>
         <Link href="/admin/roles" className="btn btn-ghost">
           Rôles & permissions

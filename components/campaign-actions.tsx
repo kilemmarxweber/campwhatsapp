@@ -18,23 +18,32 @@ export function CampaignActions({
   orgSlug,
   campaignId,
   status,
+  channel = "whatsapp",
   failedCount,
 }: {
   organizationId: string;
   orgSlug: string;
   campaignId: string;
   status: string;
+  channel?: "whatsapp" | "sms";
   failedCount: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const canResend = ["completed", "cancelled", "failed"].includes(status);
+  const smsPendingProvider = channel === "sms";
+  const canResend =
+    !smsPendingProvider && ["completed", "cancelled", "failed"].includes(status);
   const canEdit = status !== "sending";
   const canDelete = status !== "sending";
 
   return (
     <div className="flex flex-wrap gap-2">
-      {(status === "draft" || status === "failed") && (
+      {smsPendingProvider ? (
+        <p className="self-center text-sm text-[var(--fg-muted)]">
+          Envoi SMS en attente d’un fournisseur configuré.
+        </p>
+      ) : null}
+      {!smsPendingProvider && (status === "draft" || status === "failed") && (
         <button
           type="button"
           className="btn btn-primary"
@@ -94,7 +103,7 @@ export function CampaignActions({
           Renvoyer
         </ConfirmAlertDialogButton>
       )}
-      {failedCount > 0 && (
+      {!smsPendingProvider && failedCount > 0 && (
         <button
           type="button"
           className="btn btn-ghost"

@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test lib/auth/tenant-access.test.ts lib/auth/governance-rules.test.ts lib/campaigns/channel-rules.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -27,6 +28,7 @@
     "libphonenumber-js": "^1.13.13",
     "lucide-react": "^1.47.0",
     "next": "16.3.5",
+    "nodemailer": "^10.0.16",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",

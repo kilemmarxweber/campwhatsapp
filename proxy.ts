@@ -13,6 +13,7 @@ function isProtected(pathname: string) {
     pathname.startsWith("/o/") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/organisations") ||
     pathname.startsWith("/admin")
   );
 }
@@ -30,7 +31,11 @@ export async function proxy(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
   const isAuthenticated = Boolean(session?.user);
 
-  if (isAuthPage(pathname) && isAuthenticated) {
+  if (
+    isAuthPage(pathname) &&
+    isAuthenticated &&
+    !pathname.startsWith("/auth/reset-password")
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

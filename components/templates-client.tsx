@@ -9,11 +9,16 @@ import {
   updateTemplate,
 } from "@/lib/campaigns/actions";
 import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
+import {
+  BASE_CONTACT_VARS,
+  extractTemplateKeys,
+} from "@/lib/campaigns/render-template";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { MediaThumb } from "@/components/media-thumb";
 import {
   APP_LINKS,
   MessageCardPreview,
+  PlaceholderText,
   applyTextStyle,
   type TextStyle,
 } from "@/components/message-card-preview";
@@ -39,16 +44,18 @@ type TemplateRow = {
   } | null;
 };
 
-const DEFAULT_BODY = "Bonjour {{name}},\n\nDécouvrez nos offres TVS Motors.";
+const DEFAULT_BODY = "Bonjour {{name}},\n\nDécouvrez nos offres.";
 
 export function TemplatesClient({
   organizationId,
   orgSlug,
+  brandName,
   templates,
   media,
 }: {
   organizationId: string;
   orgSlug: string;
+  brandName: string;
   templates: TemplateRow[];
   media: Media[];
 }) {
@@ -63,7 +70,7 @@ export function TemplatesClient({
   const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [mediaId, setMediaId] = useState("");
   const [textStyle, setTextStyle] = useState<TextStyle>("normal");
-  const [link1Label, setLink1Label] = useState("Site TVS");
+  const [link1Label, setLink1Label] = useState("Site");
   const [link1Url, setLink1Url] = useState(APP_LINKS[0].url);
   const [link2Label, setLink2Label] = useState("");
   const [link2Url, setLink2Url] = useState("");
@@ -78,13 +85,26 @@ export function TemplatesClient({
       channel === "sms"
         ? composeSmsText(body, { link1Label, link1Url, link2Label, link2Url })
         : composeTemplateCaption(applyTextStyle(body, textStyle), {
-        link1Label,
-        link1Url,
-        link2Label,
-        link2Url,
-      }),
-    [body, textStyle, link1Label, link1Url, link2Label, link2Url],
+            link1Label,
+            link1Url,
+            link2Label,
+            link2Url,
+          }),
+    [body, textStyle, link1Label, link1Url, link2Label, link2Url, channel],
   );
+  const previewVariables = useMemo(
+    () => extractTemplateKeys(captionPreview),
+    [captionPreview],
+  );
+
+  function insertVariable(key: string) {
+    const token = `{{${key}}}`;
+    setBody((prev) => {
+      const sep =
+        !prev || prev.endsWith(" ") || prev.endsWith("\n") ? "" : " ";
+      return `${prev}${sep}${token}`;
+    });
+  }
 
   function resetForm() {
     setEditingId(null);
@@ -94,7 +114,7 @@ export function TemplatesClient({
     setChannel("whatsapp");
     setMediaId("");
     setTextStyle("normal");
-    setLink1Label("Site TVS");
+    setLink1Label("Site");
     setLink1Url(APP_LINKS[0].url);
     setLink2Label("");
     setLink2Url("");
@@ -108,7 +128,7 @@ export function TemplatesClient({
     setChannel(t.channel);
     setMediaId(t.mediaId ?? "");
     setTextStyle("normal");
-    setLink1Label(t.link1Label ?? "Site TVS");
+    setLink1Label(t.link1Label ?? "Site");
     setLink1Url(t.link1Url ?? APP_LINKS[0].url);
     setLink2Label(t.link2Label ?? "");
     setLink2Url(t.link2Url ?? "");
@@ -153,7 +173,11 @@ export function TemplatesClient({
                 toast.success("Template mis à jour");
               } else {
                 await createTemplate(payload);
-                toast.success("Template créé (image + texte + liens)");
+                toast.success(
+                  channel === "sms"
+                    ? "Template SMS créé"
+                    : "Template WhatsApp créé",
+                );
               }
               resetForm();
               router.refresh();
@@ -170,8 +194,9 @@ export function TemplatesClient({
                 {editingId ? "Modifier le template" : "Nouveau template"}
               </h2>
               <p className="mt-1 text-sm text-[var(--fg-muted)]">
-                Ici : image/vidéo, style du texte et 1 ou 2 liens. La campagne
-                n&apos;ajoute ensuite qu&apos;un texte court.
+                {channel === "sms"
+                  ? "SMS : texte, variables {{name}}, {{phone}}, … et 1 ou 2 liens."
+                  : "WhatsApp : texte, variables {{name}}, {{phone}}, …, style, média et 1 ou 2 liens."}
               </p>
             </div>
             {editingId ? (
@@ -268,6 +293,19 @@ export function TemplatesClient({
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {BASE_CONTACT_VARS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: "0.8rem", padding: "0.35rem 0.7rem" }}
+                  onClick={() => insertVariable(key)}
+                >
+                  + {`{{${key}}}`}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -299,7 +337,7 @@ export function TemplatesClient({
                   id="tpl-l1-label"
                   value={link1Label}
                   onChange={(e) => setLink1Label(e.target.value)}
-                  placeholder="Site TVS"
+                  placeholder="Site"
                 />
               </div>
               <div className="field">
@@ -345,16 +383,18 @@ export function TemplatesClient({
           </button>
         </div>
 
-        {channel === "whatsapp" ? <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
-            Aperçu carte
+            {channel === "sms" ? "Aperçu SMS" : "Aperçu WhatsApp"}
           </p>
           <MessageCardPreview
+            channel={channel}
+            brand={brandName}
             messageType={messageType}
             caption={captionPreview}
             textStyle={textStyle}
             media={
-              selectedMedia?.storagePath
+              channel === "whatsapp" && selectedMedia?.storagePath
                 ? {
                     storagePath: selectedMedia.storagePath,
                     kind: selectedMedia.kind,
@@ -363,7 +403,14 @@ export function TemplatesClient({
                 : null
             }
           />
-        </div> : null}
+          {previewVariables.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {previewVariables.map((key) => (
+                <span key={key} className="badge font-mono" style={{ textTransform: "none" }}>{`{{${key}}}`}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </form>
 
       <ul className="flex flex-col gap-3">
@@ -427,9 +474,10 @@ export function TemplatesClient({
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-                <pre className="whitespace-pre-wrap font-sans text-sm text-[var(--fg-muted)]">
-                  {full}
-                </pre>
+                <PlaceholderText
+                  text={full}
+                  className="whitespace-pre-wrap text-sm text-[var(--fg-muted)]"
+                />
                 {t.media?.storagePath ? (
                   <div className="max-w-[200px]">
                     <MediaThumb

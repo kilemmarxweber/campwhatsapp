@@ -50,6 +50,17 @@ export async function processCampaign(campaignId: string) {
 
   if (!campaign) throw new Error("Campagne introuvable");
   if (campaign.status === "cancelled") return;
+  if (campaign.channel === "sms") {
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: "failed", completedAt: new Date() },
+    });
+    await prisma.campaignRecipient.updateMany({
+      where: { campaignId, status: { in: ["pending", "queued", "failed"] } },
+      data: { status: "failed", error: "L'envoi SMS n'est pas encore configuré." },
+    });
+    throw new Error("L'envoi SMS n'est pas encore configuré.");
+  }
 
   await prisma.campaign.update({
     where: { id: campaignId },

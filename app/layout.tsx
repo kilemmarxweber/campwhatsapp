@@ -16,9 +16,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TVS Motors — Campagnes WhatsApp",
+  title: "Campagnes — WhatsApp & SMS",
   description:
-    "Campagnes WhatsApp TVS R.D. Congo — messages, images et vidéos via Klambo",
+    "Gérez vos campagnes WhatsApp et SMS multicanales — messages, images, vidéos et liens.",
 };
 
 export default function RootLayout({

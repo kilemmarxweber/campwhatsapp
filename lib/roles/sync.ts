@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import prisma from "@/lib/prisma";
 import {
   organizationRoleStatements,
+  isOwnerOrgRole,
   ORG_ROLE,
 } from "@/lib/permissions";
 import {
@@ -122,9 +123,9 @@ export async function listAssignableRoleSlugs(): Promise<
     orderBy: [{ isSystem: "desc" }, { name: "asc" }],
     select: { slug: true, name: true },
   });
-  if (roles.length > 0) return roles;
+  const assignable = roles.filter((role) => !isOwnerOrgRole(role.slug));
+  if (assignable.length > 0) return assignable;
   return [
-    { slug: ORG_ROLE.OWNER, name: "Propriétaire" },
     { slug: ORG_ROLE.ADMIN, name: "Administrateur" },
     { slug: ORG_ROLE.USER, name: "Utilisateur" },
   ];

@@ -87,7 +87,8 @@ async function ensureOrg(userId: string) {
         name: ORG_NAME,
         slug: ORG_SLUG,
         createdAt: new Date(),
-        metadata: JSON.stringify({ seeded: true, brand: "TVS Motors" }),
+        tenantId: tenant.id,
+        metadata: JSON.stringify({ seeded: true, brand: ORG_NAME }),
       },
     });
     console.log(`✓ Organisation créée : ${ORG_NAME}`);

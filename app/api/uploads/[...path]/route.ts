@@ -1,5 +1,6 @@
 import path from "path";
 import { NextResponse } from "next/server";
+import { requireOrgMembership } from "@/lib/auth/organization-permission";
 import {
   listUploadDirectories,
   readUploadBuffer,
@@ -26,6 +27,23 @@ export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const { path: parts } = await params;
     const relative = safeUploadRelativePath(parts.join("/"));
+    const segments = relative.split(/[/\\]/).filter(Boolean);
+    const organizationId = segments[0] === "uploads" ? segments[1] : segments[0];
+    if (!organizationId) {
+      return NextResponse.json(
+        { ok: false, message: "Accès succursale refusé" },
+        { status: 403 },
+      );
+    }
+    try {
+      await requireOrgMembership(organizationId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Accès refusé";
+      return NextResponse.json(
+        { ok: false, message },
+        { status: message === "Non authentifié" ? 401 : 403 },
+      );
+    }
     const buffer = await readUploadBuffer(relative);
     const extension = path.extname(relative).toLowerCase();
     const contentType = CONTENT_TYPES[extension] ?? "application/octet-stream";

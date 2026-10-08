@@ -32,6 +32,13 @@ export const ALL_ORG_ROLE_SLUGS = [
   ORG_ROLE.USER,
 ] as const;
 
+export function isOwnerOrgRole(role: string | null | undefined) {
+  return (role ?? "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .includes(ORG_ROLE.OWNER);
+}
+
 export function normalizeOrgRole(
   raw: string | null | undefined,
 ): (typeof ALL_ORG_ROLE_SLUGS)[number] | string {

@@ -42,13 +42,14 @@ export default async function TemplatesPage({
       <div>
         <h1 className="text-2xl font-semibold">Templates</h1>
         <p className="text-[var(--fg-muted)]">
-          Image, style du texte et liens — la campagne n&apos;ajoute qu&apos;un
-          texte court
+          WhatsApp (texte, image, vidéo) ou SMS (texte et liens). La campagne
+          n&apos;ajoute qu&apos;un texte court.
         </p>
       </div>
       <TemplatesClient
         organizationId={org.id}
         orgSlug={orgSlug}
+        brandName={org.name}
         templates={templates}
         media={media}
       />

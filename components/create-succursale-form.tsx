@@ -1,9 +1,20 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { createSuccursale } from "@/lib/succursales/actions";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 function slugify(value: string) {
   return value
@@ -15,91 +26,87 @@ function slugify(value: string) {
     .slice(0, 48);
 }
 
-export function CreateSuccursaleForm({
-  tenants,
-}: {
-  tenants: { id: string; name: string; slug: string }[];
-}) {
+export function AddSuccursaleButton({ tenantId }: { tenantId: string }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [tenantId, setTenantId] = useState(tenants[0]?.id ?? "new");
-  const [tenantName, setTenantName] = useState("");
-  const [tenantSlug, setTenantSlug] = useState("");
+
+  function reset() {
+    setName("");
+    setSlug("");
+  }
 
   return (
-    <form
-      className="surface flex max-w-lg flex-col gap-4 p-6"
-      onSubmit={(e) => {
-        e.preventDefault();
-        startTransition(async () => {
-          try {
-            const created = await createSuccursale({
-              name,
-              slug: slug || slugify(name),
-              ...(tenantId === "new"
-                ? { tenantName, tenantSlug: tenantSlug || slugify(tenantName) }
-                : { tenantId }),
-            });
-            toast.success("Succursale créée");
-            router.push(`/o/${created.slug}`);
-            router.refresh();
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Erreur");
-          }
-        });
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
       }}
     >
-      <h2 className="text-lg font-medium">Nouvelle succursale</h2>
-      <p className="text-sm text-[var(--fg-muted)]">
-        Contacts et campagnes isolés par site. La connexion WhatsApp est
-        partagée au siège.
-      </p>
-      <div className="field">
-        <label htmlFor="branch-tenant">Organisation</label>
-        <select id="branch-tenant" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
-          {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          <option value="new">Créer une organisation</option>
-        </select>
-      </div>
-      {tenantId === "new" ? (
-        <>
-          <div className="field">
-            <label htmlFor="tenant-name">Nom de l’organisation</label>
-            <input id="tenant-name" required value={tenantName} onChange={(e) => { setTenantName(e.target.value); setTenantSlug(slugify(e.target.value)); }} />
-          </div>
-          <div className="field">
-            <label htmlFor="tenant-slug">Slug de l’organisation</label>
-            <input id="tenant-slug" required value={tenantSlug} onChange={(e) => setTenantSlug(slugify(e.target.value))} />
-          </div>
-        </>
-      ) : null}
-      <div className="field">
-        <label htmlFor="branch-name">Nom</label>
-        <input
-          id="branch-name"
-          required
-          placeholder="ex. Kinshasa Centre"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setSlug(slugify(e.target.value));
+      <DialogTrigger render={<Button />}>
+        <PlusIcon />
+        Ajouter
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            startTransition(async () => {
+              try {
+                await createSuccursale({
+                  name,
+                  slug: slug || slugify(name),
+                  tenantId,
+                });
+                toast.success("Succursale créée");
+                reset();
+                setOpen(false);
+                router.refresh();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Erreur");
+              }
+            });
           }}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="branch-slug">Slug (URL)</label>
-        <input
-          id="branch-slug"
-          required
-          value={slug}
-          onChange={(e) => setSlug(slugify(e.target.value))}
-        />
-      </div>
-      <button className="btn btn-primary" disabled={pending} type="submit">
-        {pending ? "Création…" : "Créer la succursale"}
-      </button>
-    </form>
+        >
+          <DialogHeader className="pr-8">
+            <DialogTitle>Nouvelle succursale</DialogTitle>
+            <DialogDescription>
+              Les contacts et les campagnes restent isolés dans cette succursale.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="field">
+            <label htmlFor="branch-name">Nom</label>
+            <input
+              id="branch-name"
+              required
+              placeholder="ex. Kinshasa Centre"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setSlug(slugify(event.target.value));
+              }}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="branch-slug">Slug</label>
+            <input
+              id="branch-slug"
+              required
+              value={slug}
+              onChange={(event) => setSlug(slugify(event.target.value))}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending || !tenantId}>
+              {pending ? "Création…" : "Ajouter"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

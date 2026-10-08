@@ -86,8 +86,8 @@ model Organization {
   logo              String?
   createdAt         DateTime
   metadata          String?
-  tenantId          String?
-  tenant            TenantOrganization? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantId          String
+  tenant            TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   invitations       Invitation[]
   members           Member[]
   organizationroles OrganizationRole[]

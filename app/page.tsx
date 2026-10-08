@@ -17,31 +17,20 @@ export default async function HomePage() {
         }}
       />
       <p className="brand-mark mb-4 text-sm uppercase tracking-[0.18em]">
-        <span className="tvs">TVS</span>
-        <span className="motors">Motors</span>
+        Campagnes
       </p>
       <h1 className="mb-4 text-4xl font-bold tracking-tight text-[var(--tvs-blue-deep)] sm:text-5xl">
-        Campagnes WhatsApp
+        WhatsApp & SMS
       </h1>
       <p className="mb-8 max-w-xl text-lg text-[var(--fg-muted)]">
-        Distributeur exclusif TVS en R.D. Congo — créez des campagnes texte,
-        image ou vidéo et envoyez-les à vos clients depuis chaque succursale.
+        Créez des campagnes texte, image ou vidéo WhatsApp et SMS — envoyez-les
+        à vos clients depuis chaque succursale.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/auth/sign-in" className="btn btn-primary">
           Se connecter
         </Link>
       </div>
-      <p className="mt-10 text-sm text-[var(--fg-muted)]">
-        <a
-          href="https://www.tvsrdcongo.com/"
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-[var(--tvs-red)] underline-offset-4 hover:text-[var(--tvs-blue)]"
-        >
-          tvsrdcongo.com
-        </a>
-      </p>
     </main>
   );
 }

@@ -4,7 +4,7 @@ import { publicUploadUrl } from "@/lib/upload-url";
 export const APP_LINKS = [
   {
     id: "site",
-    label: "Site TVS",
+    label: "Site",
     url:
       process.env.NEXT_PUBLIC_APP_SITE_URL?.trim() ||
       "https://www.tvsrdcongo.com/",
@@ -64,7 +64,50 @@ function uppercasePreservingPlaceholders(text: string): string {
   return parts.join("");
 }
 
+const PLACEHOLDER = /\{\{\s*[a-zA-Z0-9_]+\s*\}\}/gi;
+
+/** Affiche le texte en gardant {{name}}, {{phone}}, … visibles. */
+export function PlaceholderText({
+  text,
+  className,
+  style,
+}: {
+  text: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const parts: Array<string | { token: string; key: number }> = [];
+  const re = new RegExp(PLACEHOLDER.source, "gi");
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let index = 0;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    parts.push({ token: match[0], key: index++ });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+
+  return (
+    <p className={className} style={style}>
+      {parts.map((part, i) =>
+        typeof part === "string" ? (
+          <span key={`t-${i}`}>{part}</span>
+        ) : (
+          <span
+            key={part.key}
+            className="rounded bg-[var(--tvs-blue-soft)] px-1 font-medium text-[var(--tvs-blue)]"
+          >
+            {part.token}
+          </span>
+        ),
+      )}
+    </p>
+  );
+}
+
 type MessageCardPreviewProps = {
+  channel?: "whatsapp" | "sms";
   messageType: "text" | "image" | "video";
   caption: string;
   textStyle?: TextStyle;
@@ -78,16 +121,18 @@ type MessageCardPreviewProps = {
 
 /** Carte unique style WhatsApp : média en haut, texte + liens en bas. */
 export function MessageCardPreview({
+  channel = "whatsapp",
   messageType,
   caption,
   textStyle = "normal",
   media,
-  brand = "TVS Motors",
+  brand = "Succursale",
 }: MessageCardPreviewProps) {
   const src = media?.storagePath
     ? publicUploadUrl(media.storagePath)
     : null;
-  const isMedia = messageType === "image" || messageType === "video";
+  const isSms = channel === "sms";
+  const isMedia = !isSms && (messageType === "image" || messageType === "video");
 
   const captionStyle: CSSProperties =
     textStyle === "promo"
@@ -121,7 +166,7 @@ export function MessageCardPreview({
         }}
       >
         <span>{brand}</span>
-        <span style={{ opacity: 0.85 }}>WhatsApp</span>
+        <span style={{ opacity: 0.85 }}>{isSms ? "SMS" : "WhatsApp"}</span>
       </div>
 
       {isMedia && src ? (
@@ -151,16 +196,17 @@ export function MessageCardPreview({
       ) : null}
 
       <div className="space-y-2 px-3 py-3">
-        <p
+        <PlaceholderText
+          text={caption.trim() || "Votre texte apparaîtra ici…"}
           className="whitespace-pre-wrap text-sm leading-relaxed"
-          style={captionStyle}
-        >
-          {caption.trim() || "Votre légende apparaîtra ici…"}
-        </p>
+          style={isSms ? { color: "var(--tvs-blue-deep)" } : captionStyle}
+        />
         <p className="text-[10px] text-[var(--fg-muted)]">
-          {isMedia
-            ? "Envoyé ensemble : média + texte (légende WhatsApp)"
-            : "Message texte seul"}
+          {isSms
+            ? "Texte (variables {{name}}, {{phone}}, …) et liens, sans média"
+            : isMedia
+              ? "Envoyé ensemble : média + texte (variables {{name}}, {{phone}}, …)"
+              : "Message texte (variables {{name}}, {{phone}}, …)"}
         </p>
       </div>
     </div>

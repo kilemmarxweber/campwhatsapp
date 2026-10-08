@@ -18,6 +18,8 @@ export default async function AdminLayout({
       <AppHeader
         title="Siège"
         subtitle="Administration entreprise"
+        homeHref="/organisations"
+        showOrganisationsLink
         showSiegeLink={false}
         contextLabel="Siège"
         user={{
@@ -30,7 +32,7 @@ export default async function AdminLayout({
           { href: "/admin", label: "Vue d'ensemble" },
           { href: "/admin/klambo", label: "WhatsApp" },
           { href: "/admin/roles", label: "Rôles" },
-          { href: "/admin/succursales", label: "Succursales" },
+          { href: "/organisations", label: "Organisations" },
         ]}
       />
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>

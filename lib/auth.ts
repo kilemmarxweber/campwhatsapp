@@ -1,5 +1,6 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, customSession, organization } from "better-auth/plugins";
 import prisma from "@/lib/prisma";
 import {
@@ -7,14 +8,15 @@ import {
   ensureTenantMembership,
   getSessionOrganizationContext,
 } from "@/lib/auth/org-membership";
+import { getGovernanceLevel } from "@/lib/auth/governance";
 import {
   APP_ROLE,
   ORG_ROLE,
   applicationRoles,
   authAccessControl,
-  isAppAdminRole,
   organizationRoles,
 } from "@/lib/permissions";
+import { sendPasswordResetEmail } from "@/lib/email/send-password-reset";
 import {
   seedSystemGlobalRoles,
   syncAllGlobalRolesToOrg,
@@ -31,10 +33,42 @@ const authOptions = {
     autoSignIn: true,
     minPasswordLength: 6,
     maxPasswordLength: 256,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        url,
+      });
+    },
   },
   trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:3000"],
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email") return;
+      const email =
+        typeof ctx.body?.email === "string" ? ctx.body.email.trim().toLowerCase() : "";
+      if (!email) {
+        throw new APIError("BAD_REQUEST", { message: "Email requis" });
+      }
+      const invitation = await prisma.invitation.findFirst({
+        where: {
+          email: { equals: email, mode: "insensitive" },
+          status: "pending",
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+      if (!invitation) {
+        throw new APIError("BAD_REQUEST", {
+          message: "Une invitation valide est nécessaire pour créer un compte.",
+        });
+      }
+    }),
   },
   plugins: [
     admin({
@@ -46,8 +80,20 @@ const authOptions = {
     organization({
       ac: authAccessControl,
       creatorRole: ORG_ROLE.OWNER,
+      schema: {
+        organization: {
+          additionalFields: {
+            tenantId: {
+              type: "string",
+              input: true,
+              required: true,
+            },
+          },
+        },
+      },
       allowUserToCreateOrganization: async (user) => {
-        return isAppAdminRole(user.role);
+        const level = await getGovernanceLevel(user.id, user.role);
+        return level === "owner" || level === "admin";
       },
       organizationLimit: async () => false,
       dynamicAccessControl: {

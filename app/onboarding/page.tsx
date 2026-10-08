@@ -1,14 +1,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { isAppAdminRole } from "@/lib/permissions";
+import { getGovernanceLevel } from "@/lib/auth/governance";
 
-/** Ancienne route — la création de succursale se fait au siège. */
+/** Ancienne route — propriétaires et administrateurs arrivent sur leurs organisations. */
 export default async function OnboardingPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/auth/sign-in");
-  if (isAppAdminRole(session.user.role)) {
-    redirect("/admin/succursales");
-  }
+  const level = await getGovernanceLevel(session.user.id, session.user.role);
+  if (level) redirect("/organisations");
   redirect("/dashboard");
 }

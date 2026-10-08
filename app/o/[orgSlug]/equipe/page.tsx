@@ -4,6 +4,7 @@ import {
   getOrganizationBySlug,
   requireOrganizationPermission,
 } from "@/lib/auth/organization-permission";
+import { isOwnerOrgRole } from "@/lib/permissions";
 import { listAssignableRoleSlugs } from "@/lib/roles/sync";
 import { EquipeClient } from "@/components/equipe-client";
 
@@ -24,17 +25,13 @@ export default async function EquipePage({
     await requireOrganizationPermission(org.id, { equipe: ["read"] });
   }
 
-  const [members, invitations, roles] = await Promise.all([
+  const [members, roles] = await Promise.all([
     prisma.member.findMany({
       where: { organizationId: org.id },
       include: {
         user: { select: { id: true, name: true, email: true } },
       },
       orderBy: { createdAt: "asc" },
-    }),
-    prisma.invitation.findMany({
-      where: { organizationId: org.id, status: "pending" },
-      orderBy: { createdAt: "desc" },
     }),
     listAssignableRoleSlugs(),
   ]);
@@ -52,8 +49,7 @@ export default async function EquipePage({
       <EquipeClient
         organizationId={org.id}
         orgSlug={orgSlug}
-        members={members}
-        invitations={invitations}
+        members={members.filter((member) => !isOwnerOrgRole(member.role))}
         roles={roles}
         canManage={canManage}
       />

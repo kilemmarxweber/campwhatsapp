@@ -64,6 +64,7 @@ export default async function CampaignDetailPage({
           orgSlug={orgSlug}
           campaignId={campaign.id}
           status={campaign.status}
+          channel={campaign.channel}
           failedCount={stats.failed}
         />
       </div>
@@ -88,10 +89,12 @@ export default async function CampaignDetailPage({
             Carte envoyée
           </p>
           <MessageCardPreview
+            channel={campaign.channel}
+            brand={org.name}
             messageType={campaign.messageType}
             caption={previewCaption}
             media={
-              campaign.media
+              campaign.channel === "whatsapp" && campaign.media
                 ? {
                     storagePath: campaign.media.storagePath,
                     kind: campaign.media.kind,

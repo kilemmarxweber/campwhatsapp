@@ -11,14 +11,18 @@ export function AppHeader({
   subtitle,
   navItems,
   user,
+  homeHref = "/dashboard",
   showSiegeLink = false,
+  showOrganisationsLink = false,
   contextLabel,
 }: {
   title: string;
   subtitle?: string;
   navItems?: AppNavItem[];
   user: ProfileUser;
+  homeHref?: string;
   showSiegeLink?: boolean;
+  showOrganisationsLink?: boolean;
   contextLabel?: string;
 }) {
   return (
@@ -32,9 +36,8 @@ export function AppHeader({
       />
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <div className="flex min-w-0 items-center gap-4">
-          <Link href="/dashboard" className="brand-mark shrink-0 text-base uppercase">
-            <span className="tvs">TVS</span>
-            <span className="motors">Motors</span>
+          <Link href={homeHref} className="brand-mark shrink-0 text-base uppercase">
+            Campagnes
           </Link>
           <Separator orientation="vertical" className="hidden h-8 sm:block" />
           <div className="min-w-0">
@@ -51,6 +54,7 @@ export function AppHeader({
         <UserProfileMenu
           user={user}
           showSiegeLink={showSiegeLink}
+          showOrganisationsLink={showOrganisationsLink}
           contextLabel={contextLabel}
         />
       </div>

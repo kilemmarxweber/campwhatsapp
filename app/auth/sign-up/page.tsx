@@ -46,7 +46,7 @@ export default function SignUpPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <Link href="/" className="brand-mark mb-8 text-sm uppercase tracking-[0.16em]">
-        ← <span className="tvs">TVS</span> <span className="motors">Motors</span>
+        ← Campagnes
       </Link>
       <h1 className="mb-6 text-3xl font-semibold text-[var(--tvs-blue-deep)]">
         Créer un compte

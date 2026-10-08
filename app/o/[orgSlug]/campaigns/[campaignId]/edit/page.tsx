@@ -81,6 +81,7 @@ export default async function EditCampaignPage({
       <CampaignForm
         organizationId={org.id}
         orgSlug={orgSlug}
+        branchName={org.name}
         contacts={contacts}
         media={media}
         lists={lists}

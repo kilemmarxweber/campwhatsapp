@@ -6,6 +6,8 @@ import {
   normalizeOrgRole,
   organizationRoleStatements,
 } from "@/lib/permissions";
+import { isPlatformOwner } from "@/lib/auth/governance";
+import { canAccessBranch } from "@/lib/auth/governance-rules";
 import { getUserOrganizationMembership } from "@/lib/auth/org-membership";
 import { parsePermission } from "@/lib/roles/permission-matrix";
 
@@ -21,7 +23,38 @@ export async function requireSession() {
 
 export async function requireOrgMembership(organizationId: string) {
   const session = await requireSession();
-  if (isAppAdminRole(session.user.role)) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, tenantId: true },
+  });
+  if (!organization?.tenantId) {
+    throw new Error("Accès succursale refusé");
+  }
+  const membership = await getUserOrganizationMembership(
+    session.user.id,
+    organizationId,
+  );
+  const tenantMember = await prisma.tenantMember.findUnique({
+    where: {
+      tenantId_userId: {
+        tenantId: organization.tenantId,
+        userId: session.user.id,
+      },
+    },
+    select: { role: true },
+  });
+  const platformOwner =
+    isAppAdminRole(session.user.role) ||
+    (await isPlatformOwner(session.user.id, session.user.role));
+  const allowed = canAccessBranch({
+    isPlatformOwner: platformOwner,
+    tenantRole: tenantMember?.role ?? null,
+    hasBranchMembership: Boolean(membership),
+  });
+  if (!allowed) {
+    throw new Error("Accès succursale refusé");
+  }
+  if (platformOwner) {
     return {
       session,
       membership: {
@@ -30,18 +63,21 @@ export async function requireOrgMembership(organizationId: string) {
       },
     };
   }
-  const membership = await getUserOrganizationMembership(
-    session.user.id,
-    organizationId,
-  );
-  if (!membership) {
-    throw new Error("Accès succursale refusé");
+  const tenantRole = (tenantMember?.role ?? "").trim().toLowerCase();
+  if (tenantRole === "owner" || tenantRole === "admin") {
+    return {
+      session,
+      membership: {
+        role: tenantRole === "owner" ? "owner" : "admin",
+        organizationId,
+      },
+    };
   }
   return {
     session,
     membership: {
-      role: normalizeOrgRole(membership.role),
-      organizationId: membership.organizationId,
+      role: normalizeOrgRole(membership?.role),
+      organizationId,
     },
   };
 }
@@ -120,6 +156,12 @@ export async function requireOrganizationPermission(
 export async function getOrganizationBySlug(slug: string) {
   return prisma.organization.findUnique({
     where: { slug },
-    select: { id: true, name: true, slug: true, logo: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logo: true,
+      tenant: { select: { id: true, name: true, slug: true } },
+    },
   });
 }

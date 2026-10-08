@@ -38,10 +38,12 @@ function initials(name: string) {
 export function UserProfileMenu({
   user,
   showSiegeLink = false,
+  showOrganisationsLink = false,
   contextLabel,
 }: {
   user: ProfileUser;
   showSiegeLink?: boolean;
+  showOrganisationsLink?: boolean;
   contextLabel?: string;
 }) {
   const router = useRouter();
@@ -95,10 +97,17 @@ export function UserProfileMenu({
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem render={<Link href="/dashboard" />}>
-            <LayoutDashboardIcon />
-            Mes succursales
-          </DropdownMenuItem>
+          {showOrganisationsLink ? (
+            <DropdownMenuItem render={<Link href="/organisations" />}>
+              <LayoutDashboardIcon />
+              Organisations
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem render={<Link href="/dashboard" />}>
+              <LayoutDashboardIcon />
+              Mes succursales
+            </DropdownMenuItem>
+          )}
           {showSiegeLink ? (
             <DropdownMenuItem render={<Link href="/admin" />}>
               <ShieldIcon />

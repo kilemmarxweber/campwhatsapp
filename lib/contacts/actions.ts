@@ -51,8 +51,13 @@ export async function deleteContact(input: {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["delete"],
   });
+  const contact = await prisma.contact.findFirst({
+    where: { id: input.contactId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!contact) throw new Error("Contact introuvable");
   await prisma.contact.delete({
-    where: { id: input.contactId },
+    where: { id: contact.id },
   });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
 }
@@ -134,12 +139,23 @@ export async function createContactList(input: {
     contacts: ["create"],
   });
 
+  const uniqueIds = [...new Set(input.contactIds)];
+  const contacts = uniqueIds.length
+    ? await prisma.contact.findMany({
+        where: { organizationId: input.organizationId, id: { in: uniqueIds } },
+        select: { id: true },
+      })
+    : [];
+  if (contacts.length !== uniqueIds.length) {
+    throw new Error("Un ou plusieurs contacts n'appartiennent pas à cette succursale");
+  }
+
   const list = await prisma.contactList.create({
     data: {
       organizationId: input.organizationId,
       name: input.name.trim(),
       members: {
-        create: input.contactIds.map((contactId) => ({ contactId })),
+        create: contacts.map((contact) => ({ contactId: contact.id })),
       },
     },
   });
@@ -156,7 +172,12 @@ export async function deleteContactList(input: {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["delete"],
   });
-  await prisma.contactList.delete({ where: { id: input.listId } });
+  const list = await prisma.contactList.findFirst({
+    where: { id: input.listId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!list) throw new Error("Liste introuvable");
+  await prisma.contactList.delete({ where: { id: list.id } });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
 }
 
