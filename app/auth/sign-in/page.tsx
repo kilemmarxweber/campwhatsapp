@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import { SignInForm } from "@/components/sign-in-form";
 
 export const metadata: Metadata = {
-  title: "Connexion — Campagnes",
-  description: "Connectez-vous pour gérer vos campagnes WhatsApp et SMS.",
+  title: "Connexion",
+  description: "Connexion à Klambocore Campagnes.",
+  robots: { index: false, follow: false },
 };
 
 export default function SignInPage() {

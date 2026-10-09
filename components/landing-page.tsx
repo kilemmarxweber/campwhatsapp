@@ -23,12 +23,14 @@ export function LandingPage({
           <p className="landing-hero__klambo">Klambocore</p>
           <p className="landing-hero__brand">Campagnes</p>
           <h1 className="landing-hero__title">
-            WhatsApp &amp; SMS
-            <span className="landing-hero__title-line">pour chaque entreprise</span>
+            Klambocore Campagnes
+            <span className="landing-hero__title-line">
+              WhatsApp &amp; SMS pour chaque entreprise
+            </span>
           </h1>
           <p className="landing-hero__lead">
-            Une plateforme pour préparer, cibler et envoyer vos messages clients —
-            texte, image ou vidéo — depuis le siège jusqu’au terrain.
+            Préparez, ciblez et envoyez vos messages clients — texte, image ou
+            vidéo — via WhatsApp et SMS, du siège jusqu’au terrain.
           </p>
           <div className="landing-hero__cta">
             <Link href="/auth/sign-in" className="btn btn-primary landing-hero__btn">
@@ -109,7 +111,10 @@ export function LandingPage({
       </section>
 
       <footer className="landing-foot">
-        <p>Campagnes — plateforme d’envoi WhatsApp &amp; SMS</p>
+        <p>
+          <strong>Klambocore Campagnes</strong> — plateforme d’envoi WhatsApp
+          &amp; SMS pour entreprises
+        </p>
         <Link href="/auth/sign-in" className="btn btn-brand">
           Accéder à l’espace
         </Link>

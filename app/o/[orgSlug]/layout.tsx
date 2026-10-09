@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -9,6 +10,10 @@ import { getGovernanceLevel } from "@/lib/auth/governance";
 import { isAppAdminRole } from "@/lib/permissions";
 import { OrgFrame } from "@/components/org-frame";
 import { normalizeAppearance } from "@/lib/appearance";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function OrgLayout({
   children,

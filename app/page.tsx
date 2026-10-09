@@ -4,12 +4,21 @@ import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { LandingPage } from "@/components/landing-page";
+import { SiteJsonLd } from "@/components/site-json-ld";
 import type { LandingOrgShowcase } from "@/components/landing-hero-visual";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Campagnes — WhatsApp & SMS",
-  description:
-    "Plateforme d’envoi WhatsApp et SMS pour les entreprises : contacts, templates, campagnes et rapports.",
+  title: {
+    absolute: `${SITE.name} — ${SITE.tagline}`,
+  },
+  description: SITE.description,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+    url: "/",
+  },
 };
 
 export default async function HomePage() {
@@ -86,5 +95,10 @@ export default async function HomePage() {
     }),
   );
 
-  return <LandingPage organizations={organizations} />;
+  return (
+    <>
+      <SiteJsonLd />
+      <LandingPage organizations={organizations} />
+    </>
+  );
 }
