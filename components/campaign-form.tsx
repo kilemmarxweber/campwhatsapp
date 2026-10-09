@@ -166,13 +166,25 @@ export function CampaignForm({
     );
   }
 
+  const hasAudience = Boolean(listId) || selected.length > 0;
+  const canSubmit =
+    Boolean(channel) &&
+    name.trim().length > 0 &&
+    Boolean(templateId) &&
+    Boolean(selectedTemplate) &&
+    hasAudience;
+
   return (
     <form
-      className="flex flex-col gap-6"
+      className={`campaign-form flex flex-col gap-6${canSubmit ? " has-submit-bar" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
-        if (!templateId) {
-          toast.error("Choisissez un template");
+        if (!canSubmit) {
+          if (!name.trim()) toast.error("Indiquez le nom de la campagne");
+          else if (!templateId) toast.error("Choisissez un template");
+          else if (!hasAudience) {
+            toast.error("Sélectionnez un groupe ou au moins un contact");
+          }
           return;
         }
         startTransition(async () => {
@@ -414,17 +426,21 @@ export function CampaignForm({
         )}
       </div>
 
-      <button className="btn btn-primary self-start" disabled={pending} type="submit">
-        {pending
-          ? isEdit
-            ? "Enregistrement…"
-            : "Envoi…"
-          : isEdit
-            ? "Enregistrer"
-            : channel === "sms" && !smsConfigured
-              ? "Enregistrer le brouillon"
-              : "Créer et envoyer"}
-      </button>
+      {canSubmit ? (
+        <div className="campaign-form-submit-bar">
+          <button className="btn btn-primary" disabled={pending} type="submit">
+            {pending
+              ? isEdit
+                ? "Enregistrement…"
+                : "Envoi…"
+              : isEdit
+                ? "Enregistrer"
+                : channel === "sms" && !smsConfigured
+                  ? "Enregistrer le brouillon"
+                  : "Créer et envoyer"}
+          </button>
+        </div>
+      ) : null}
     </form>
   );
 }

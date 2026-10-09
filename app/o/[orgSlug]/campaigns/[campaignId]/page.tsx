@@ -4,6 +4,7 @@ import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignActions } from "@/components/campaign-actions";
 import { CampaignLiveRefresh } from "@/components/campaign-live-refresh";
 import { MessageCardPreview } from "@/components/message-card-preview";
+import { RecipientStatusIcon } from "@/components/recipient-status-icon";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { isSmsConfigured } from "@/lib/sms/config";
 
@@ -141,7 +142,7 @@ export default async function CampaignDetailPage({
                 </td>
                 <td className="max-w-xs truncate text-sm">{r.renderedBody}</td>
                 <td>
-                  <span className="badge">{r.status}</span>
+                  <RecipientStatusIcon status={r.status} />
                 </td>
                 <td className="text-sm text-[var(--danger)]">
                   {r.error || "—"}

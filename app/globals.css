@@ -645,6 +645,68 @@
   }
 }
 
+/* Campagne : bouton Créer et envoyer fixé en bas (si formulaire prêt) */
+.campaign-form.has-submit-bar {
+  padding-bottom: 5.5rem;
+}
+
+.campaign-form-submit-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg-elevated) 92%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 24px color-mix(in oklab, #0b1f33 8%, transparent);
+}
+
+.campaign-form-submit-bar .btn {
+  min-width: 11rem;
+}
+
+.recipient-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+}
+
+.recipient-status.is-ok {
+  color: #16a34a;
+  background: color-mix(in oklab, #16a34a 12%, transparent);
+}
+
+.recipient-status.is-pending {
+  color: var(--tvs-blue);
+  background: color-mix(in oklab, var(--tvs-blue) 12%, transparent);
+}
+
+.recipient-status.is-failed {
+  color: #dc2626;
+  background: color-mix(in oklab, #dc2626 12%, transparent);
+}
+
+.recipient-status.is-unknown {
+  color: var(--fg-muted);
+  background: color-mix(in oklab, var(--fg-muted) 10%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .campaign-form-submit-bar {
+    padding-left: max(1.25rem, calc((100vw - 72rem) / 2 + 1.25rem));
+    padding-right: max(1.25rem, calc((100vw - 72rem) / 2 + 1.25rem));
+  }
+}
+
 .field input,
 .field textarea,
 .field select {
