@@ -79,10 +79,11 @@ export async function sendInfobipWhatsappTemplate(input: {
   const message = data.messages?.[0];
   const group = message?.status?.groupName?.toUpperCase();
   if (group === "REJECTED") {
-    throw new InfobipSmsError(
-      message?.status?.description || "Infobip a refusé le modèle WhatsApp.",
-      502,
-    );
+    const description = message?.status?.description || "";
+    const detail = /invalid source/i.test(description)
+      ? "Le numéro expéditeur n'est pas un numéro WhatsApp Infobip. Utilisez 447860088970, pas le numéro du destinataire."
+      : description || "Infobip a refusé le modèle WhatsApp.";
+    throw new InfobipSmsError(detail, 502);
   }
   return { messageId: message?.messageId || messageId };
 }

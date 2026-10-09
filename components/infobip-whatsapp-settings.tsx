@@ -187,7 +187,8 @@ export function WhatsappProviderSettings({
                 required
               />
               <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-                Valeur <code className="font-mono">from</code> de l&apos;API WhatsApp.
+                Numéro WhatsApp enregistré chez Infobip, par exemple 447860088970.
+                Ce n&apos;est pas le téléphone qui reçoit le message.
               </p>
             </div>
             <div className="flex justify-end">
