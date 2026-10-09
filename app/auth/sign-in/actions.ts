@@ -4,6 +4,11 @@ import { headers } from "next/headers";
 import { APIError } from "better-auth/api";
 import { auth } from "@/lib/auth";
 import { resolvePostLoginPath } from "@/lib/auth/post-login-redirect";
+import {
+  isSafeCallbackPath,
+  validatePassword,
+  validateSignInPassword,
+} from "@/lib/input-security";
 import prisma from "@/lib/prisma";
 
 export async function completeFirstLoginPasswordAction(input: {
@@ -12,16 +17,16 @@ export async function completeFirstLoginPasswordAction(input: {
   confirmPassword: string;
   callbackUrl?: string | null;
 }): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
-  const currentPassword = input.currentPassword;
-  const newPassword = input.newPassword.trim();
-  const confirmPassword = input.confirmPassword;
-  if (!currentPassword) {
+  const current = validateSignInPassword(input.currentPassword);
+  if (!current.ok) {
     return { ok: false, message: "Le mot de passe temporaire est requis." };
   }
-  if (newPassword.length < 6) {
-    return { ok: false, message: "Le nouveau mot de passe doit contenir au moins 6 caractères." };
+
+  const next = validatePassword(input.newPassword, { requireComplexity: true });
+  if (!next.ok) {
+    return { ok: false, message: next.message };
   }
-  if (newPassword !== confirmPassword) {
+  if (next.value !== input.confirmPassword) {
     return { ok: false, message: "Les mots de passe ne correspondent pas." };
   }
 
@@ -35,14 +40,17 @@ export async function completeFirstLoginPasswordAction(input: {
     select: { mustChangePassword: true },
   });
   if (!user?.mustChangePassword) {
-    return { ok: false, message: "Aucun changement de mot de passe n'est requis." };
+    return {
+      ok: false,
+      message: "Aucun changement de mot de passe n'est requis.",
+    };
   }
 
   try {
     await auth.api.changePassword({
       body: {
-        currentPassword,
-        newPassword,
+        currentPassword: current.value,
+        newPassword: next.value,
         revokeOtherSessions: false,
       },
       headers: await headers(),
@@ -66,10 +74,13 @@ export async function completeFirstLoginPasswordAction(input: {
     data: { mustChangePassword: false },
   });
 
+  const callbackUrl = isSafeCallbackPath(input.callbackUrl)
+    ? input.callbackUrl
+    : null;
   const path = await resolvePostLoginPath(
     session.user.id,
     session.user.role,
-    input.callbackUrl,
+    callbackUrl,
   );
   return { ok: true, path };
 }

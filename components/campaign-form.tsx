@@ -13,6 +13,10 @@ import {
 } from "@/lib/campaigns/render-template";
 import { MessageCardPreview } from "@/components/message-card-preview";
 import { RequiredMark } from "@/components/required-mark";
+import {
+  filterCampaignName,
+  filterSafeText,
+} from "@/lib/input-security";
 
 type Contact = {
   id: string;
@@ -249,9 +253,11 @@ export function CampaignForm({
             <input
               id="campaign-name"
               required
+              maxLength={120}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setName(filterCampaignName(e.target.value))}
               placeholder="Ex. Promo Mars — Kinshasa"
+              spellCheck={false}
             />
           </div>
 
@@ -312,8 +318,9 @@ export function CampaignForm({
             <textarea
               id="campaign-note"
               rows={3}
+              maxLength={2000}
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => setNote(filterSafeText(e.target.value, 2000))}
               placeholder="Optionnel — ex. Offre valable jusqu’au 30 mars — {{name}}"
             />
             <div className="mt-2">

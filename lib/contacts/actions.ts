@@ -7,6 +7,11 @@ import prisma from "@/lib/prisma";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
 import { getDefaultCountryForBranch } from "@/lib/klambo/org";
 import { normalizePhone } from "@/lib/phone";
+import {
+  filterPersonName,
+  isValidEmail,
+  normalizeEmail,
+} from "@/lib/input-security";
 import { parseContactsExcel } from "@/lib/contacts/import-excel";
 import { buildContactsWorkbook } from "@/lib/contacts/export-excel";
 export type ContactRow = {
@@ -89,12 +94,19 @@ export async function createContact(input: {
   );
   if (!phone) throw new Error("Numéro de téléphone invalide");
 
+  const name = filterPersonName(input.name ?? "") || null;
+  const emailRaw = (input.email ?? "").trim();
+  const email = emailRaw ? normalizeEmail(emailRaw) : null;
+  if (email && !isValidEmail(email)) {
+    throw new Error("Email invalide");
+  }
+
   const contact = await prisma.contact.create({
     data: {
       organizationId: input.organizationId,
       phone,
-      name: input.name?.trim() || null,
-      email: input.email?.trim() || null,
+      name,
+      email,
       variables: input.variables ?? {},
     },
   });
@@ -136,12 +148,19 @@ export async function updateContact(input: {
   });
   if (clash) throw new Error("Ce numéro existe déjà");
 
+  const name = filterPersonName(input.name ?? "") || null;
+  const emailRaw = (input.email ?? "").trim();
+  const email = emailRaw ? normalizeEmail(emailRaw) : null;
+  if (email && !isValidEmail(email)) {
+    throw new Error("Email invalide");
+  }
+
   await prisma.contact.update({
     where: { id: existing.id },
     data: {
       phone,
-      name: input.name?.trim() || null,
-      email: input.email?.trim() || null,
+      name,
+      email,
     },
   });
   revalidatePath(`/o/${input.orgSlug}/contacts`);

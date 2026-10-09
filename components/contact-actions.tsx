@@ -17,6 +17,14 @@ import {
   updateContact,
 } from "@/lib/contacts/actions";
 import { splitStoredPhone } from "@/lib/phone";
+import {
+  EMAIL_MAX_LENGTH,
+  PERSON_NAME_MAX_LENGTH,
+  emailValidationMessage,
+  filterEmailInput,
+  filterPersonName,
+  normalizeEmail,
+} from "@/lib/input-security";
 import { usePendingOverlay } from "@/components/page-loader";
 import {
   PhoneInputField,
@@ -148,6 +156,14 @@ export function ContactActions({
                 toast.error(checked.message);
                 return;
               }
+              const trimmedEmail = email.trim();
+              if (trimmedEmail) {
+                const emailError = emailValidationMessage(trimmedEmail);
+                if (emailError) {
+                  toast.error(emailError);
+                  return;
+                }
+              }
               startTransition(async () => {
                 try {
                   await updateContact({
@@ -155,8 +171,10 @@ export function ContactActions({
                     orgSlug,
                     contactId: contact.id,
                     phone: checked.e164,
-                    name,
-                    email,
+                    name: filterPersonName(name),
+                    email: trimmedEmail
+                      ? normalizeEmail(trimmedEmail)
+                      : "",
                   });
                   toast.success("Contact mis à jour");
                   setEditOpen(false);
@@ -186,8 +204,10 @@ export function ContactActions({
                 <input
                   id={`edit-name-${contact.id}`}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  maxLength={PERSON_NAME_MAX_LENGTH}
+                  onChange={(e) => setName(filterPersonName(e.target.value))}
                   placeholder="Optionnel"
+                  spellCheck={false}
                 />
               </div>
               <div className="field field-sm">
@@ -195,8 +215,15 @@ export function ContactActions({
                 <input
                   id={`edit-email-${contact.id}`}
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  maxLength={EMAIL_MAX_LENGTH}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(filterEmailInput(e.target.value))}
+                  onBlur={() => {
+                    if (email.trim()) setEmail(normalizeEmail(email));
+                  }}
                   placeholder="Optionnel"
                 />
               </div>

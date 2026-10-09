@@ -23,6 +23,15 @@ import {
 } from "@/components/phone-input-field";
 import { TablePagination } from "@/components/table-pagination";
 import { Button } from "@/components/ui/button";
+import {
+  EMAIL_MAX_LENGTH,
+  PERSON_NAME_MAX_LENGTH,
+  emailValidationMessage,
+  filterEmailInput,
+  filterPersonName,
+  filterSafeText,
+  normalizeEmail,
+} from "@/lib/input-security";
 
 function syncContactsUrl(orgSlug: string, q: string, page: number) {
   const params = new URLSearchParams();
@@ -216,14 +225,24 @@ export function ContactsClient({
               toast.error(checked.message);
               return;
             }
+            const trimmedEmail = email.trim();
+            if (trimmedEmail) {
+              const emailError = emailValidationMessage(trimmedEmail);
+              if (emailError) {
+                toast.error(emailError);
+                return;
+              }
+            }
             startTransition(async () => {
               try {
                 await createContact({
                   organizationId,
                   orgSlug,
                   phone: checked.e164,
-                  name: name || undefined,
-                  email: email || undefined,
+                  name: filterPersonName(name) || undefined,
+                  email: trimmedEmail
+                    ? normalizeEmail(trimmedEmail)
+                    : undefined,
                 });
                 toast.success("Contact ajouté");
                 setPhoneValue({ country: phoneValue.country, national: "" });
@@ -250,8 +269,11 @@ export function ContactsClient({
               <input
                 id="contact-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                maxLength={PERSON_NAME_MAX_LENGTH}
+                onChange={(e) => setName(filterPersonName(e.target.value))}
                 placeholder="Optionnel"
+                autoComplete="name"
+                spellCheck={false}
               />
             </div>
             <div className="field field-sm">
@@ -259,10 +281,17 @@ export function ContactsClient({
               <input
                 id="contact-email"
                 type="email"
+                inputMode="email"
+                autoCapitalize="none"
                 autoComplete="email"
+                spellCheck={false}
+                maxLength={EMAIL_MAX_LENGTH}
                 placeholder="Optionnel"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(filterEmailInput(e.target.value))}
+                onBlur={() => {
+                  if (email.trim()) setEmail(normalizeEmail(email));
+                }}
               />
             </div>
           </div>
@@ -351,9 +380,11 @@ export function ContactsClient({
               <input
                 id="list-name"
                 required
+                maxLength={120}
                 value={listName}
-                onChange={(e) => setListName(e.target.value)}
+                onChange={(e) => setListName(filterSafeText(e.target.value, 120))}
                 placeholder="ex. Prospects Kinshasa"
+                spellCheck={false}
               />
             </div>
             <button

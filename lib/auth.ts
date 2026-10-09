@@ -40,8 +40,8 @@ const authOptions = {
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
-    minPasswordLength: 6,
-    maxPasswordLength: 256,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
   },
   trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:3000"],
@@ -50,9 +50,39 @@ const authOptions = {
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      const {
+        isValidEmail,
+        normalizeEmail,
+        filterPasswordInput,
+        PASSWORD_MAX_LENGTH,
+      } = await import("@/lib/input-security");
+
+      if (ctx.path === "/sign-in/email" || ctx.path === "/sign-up/email") {
+        const rawEmail =
+          typeof ctx.body?.email === "string" ? ctx.body.email : "";
+        const email = normalizeEmail(rawEmail);
+        if (!isValidEmail(email)) {
+          throw new APIError("BAD_REQUEST", { message: "Email invalide" });
+        }
+        const rawPassword =
+          typeof ctx.body?.password === "string" ? ctx.body.password : "";
+        const password = filterPasswordInput(rawPassword);
+        if (!password || password.length > PASSWORD_MAX_LENGTH) {
+          throw new APIError("BAD_REQUEST", {
+            message: "Mot de passe invalide",
+          });
+        }
+        if (ctx.body && typeof ctx.body === "object") {
+          (ctx.body as { email?: string; password?: string }).email = email;
+          (ctx.body as { email?: string; password?: string }).password = password;
+        }
+      }
+
       if (ctx.path !== "/sign-up/email") return;
       const email =
-        typeof ctx.body?.email === "string" ? ctx.body.email.trim().toLowerCase() : "";
+        typeof ctx.body?.email === "string"
+          ? normalizeEmail(ctx.body.email)
+          : "";
       if (!email) {
         throw new APIError("BAD_REQUEST", { message: "Email requis" });
       }

@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  filterPasswordInput,
+  validatePassword,
+} from "@/lib/input-security";
 
 export function ResetPasswordForm({
   token,
@@ -21,13 +27,18 @@ export function ResetPasswordForm({
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (password !== confirm) {
+    const next = validatePassword(password, { requireComplexity: true });
+    if (!next.ok) {
+      toast.error(next.message);
+      return;
+    }
+    if (next.value !== filterPasswordInput(confirm)) {
       toast.error("Les mots de passe ne correspondent pas");
       return;
     }
     setLoading(true);
     const { error: resetError } = await authClient.resetPassword({
-      newPassword: password,
+      newPassword: next.value,
       token,
     });
     setLoading(false);
@@ -65,11 +76,18 @@ export function ResetPasswordForm({
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) =>
+                setPassword(filterPasswordInput(event.target.value))
+              }
               autoComplete="new-password"
+              spellCheck={false}
             />
+            <p className="mt-1 text-xs text-[var(--fg-muted)]">
+              Min. {PASSWORD_MIN_LENGTH} caractères, lettre + chiffre.
+            </p>
           </div>
           <div className="field">
             <label htmlFor="confirm">Confirmer</label>
@@ -77,10 +95,14 @@ export function ResetPasswordForm({
               id="confirm"
               type="password"
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               value={confirm}
-              onChange={(event) => setConfirm(event.target.value)}
+              onChange={(event) =>
+                setConfirm(filterPasswordInput(event.target.value))
+              }
               autoComplete="new-password"
+              spellCheck={false}
             />
           </div>
           <button className="btn btn-primary" disabled={loading} type="submit">

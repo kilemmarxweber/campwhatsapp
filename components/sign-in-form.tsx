@@ -5,6 +5,18 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { completeFirstLoginPasswordAction } from "@/app/auth/sign-in/actions";
 import { authClient, signIn } from "@/lib/auth-client";
+import {
+  EMAIL_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  emailValidationMessage,
+  filterEmailInput,
+  filterPasswordInput,
+  isSafeCallbackPath,
+  normalizeEmail,
+  validatePassword,
+  validateSignInPassword,
+} from "@/lib/input-security";
 
 export function SignInForm() {
   const router = useRouter();
@@ -31,8 +43,22 @@ export function SignInForm() {
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    const emailError = emailValidationMessage(email);
+    if (emailError) {
+      toast.error(emailError);
+      return;
+    }
+    const pwd = validateSignInPassword(password);
+    if (!pwd.ok) {
+      toast.error(pwd.message);
+      return;
+    }
+
     setLoading(true);
-    const { error } = await signIn.email({ email, password });
+    const { error } = await signIn.email({
+      email: normalizeEmail(email),
+      password: pwd.value,
+    });
     if (error) {
       setLoading(false);
       toast.error(error.message ?? "Connexion impossible");
@@ -55,14 +81,30 @@ export function SignInForm() {
 
   async function onFirstLogin(event: React.FormEvent) {
     event.preventDefault();
+    const current = validateSignInPassword(currentPassword);
+    if (!current.ok) {
+      toast.error("Mot de passe temporaire invalide");
+      return;
+    }
+    const next = validatePassword(newPassword, { requireComplexity: true });
+    if (!next.ok) {
+      toast.error(next.message);
+      return;
+    }
+    if (next.value !== filterPasswordInput(confirmPassword)) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
+
     setLoading(true);
-    const callbackUrl = new URLSearchParams(window.location.search).get(
+    const rawCallback = new URLSearchParams(window.location.search).get(
       "callbackUrl",
     );
+    const callbackUrl = isSafeCallbackPath(rawCallback) ? rawCallback : null;
     const result = await completeFirstLoginPasswordAction({
-      currentPassword,
-      newPassword,
-      confirmPassword,
+      currentPassword: current.value,
+      newPassword: next.value,
+      confirmPassword: next.value,
       callbackUrl,
     });
     if (!result.ok) {
@@ -82,16 +124,20 @@ export function SignInForm() {
         <p className="auth-panel__lead">
           Remplacez le mot de passe temporaire avant d’accéder à l’application.
         </p>
-        <form onSubmit={onFirstLogin} className="auth-form">
+        <form onSubmit={onFirstLogin} className="auth-form" autoComplete="off">
           <div className="field">
             <label htmlFor="current-password">Mot de passe temporaire</label>
             <input
               id="current-password"
               type="password"
               required
+              maxLength={PASSWORD_MAX_LENGTH}
               value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
+              onChange={(event) =>
+                setCurrentPassword(filterPasswordInput(event.target.value))
+              }
               autoComplete="current-password"
+              spellCheck={false}
             />
           </div>
           <div className="field">
@@ -100,11 +146,19 @@ export function SignInForm() {
               id="new-password"
               type="password"
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
+              onChange={(event) =>
+                setNewPassword(filterPasswordInput(event.target.value))
+              }
               autoComplete="new-password"
+              spellCheck={false}
             />
+            <p className="mt-1 text-xs text-[var(--fg-muted)]">
+              Min. {PASSWORD_MIN_LENGTH} caractères, avec au moins une lettre et
+              un chiffre.
+            </p>
           </div>
           <div className="field">
             <label htmlFor="confirm-password">Confirmation</label>
@@ -112,13 +166,21 @@ export function SignInForm() {
               id="confirm-password"
               type="password"
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
+              onChange={(event) =>
+                setConfirmPassword(filterPasswordInput(event.target.value))
+              }
               autoComplete="new-password"
+              spellCheck={false}
             />
           </div>
-          <button className="btn btn-primary auth-form__submit" disabled={loading} type="submit">
+          <button
+            className="btn btn-primary auth-form__submit"
+            disabled={loading}
+            type="submit"
+          >
             {loading ? "Enregistrement…" : "Enregistrer le mot de passe"}
           </button>
         </form>
@@ -133,16 +195,29 @@ export function SignInForm() {
       <p className="auth-panel__lead">
         Accédez aux campagnes WhatsApp &amp; SMS de votre entreprise.
       </p>
-      <form onSubmit={onSubmit} className="auth-form">
+      <form onSubmit={onSubmit} className="auth-form" autoComplete="on">
         <div className="field">
           <label htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
+            maxLength={EMAIL_MAX_LENGTH}
+            pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+"
+            title="Format : vous@domaine.com"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
+            onChange={(event) => setEmail(filterEmailInput(event.target.value))}
+            onBlur={() => setEmail(normalizeEmail(email))}
+            onPaste={(event) => {
+              event.preventDefault();
+              const text = event.clipboardData.getData("text");
+              setEmail(filterEmailInput(text));
+            }}
+            autoComplete="username"
             placeholder="vous@entreprise.com"
           />
         </div>
@@ -153,13 +228,26 @@ export function SignInForm() {
             type="password"
             required
             minLength={6}
+            maxLength={PASSWORD_MAX_LENGTH}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) =>
+              setPassword(filterPasswordInput(event.target.value))
+            }
+            onPaste={(event) => {
+              event.preventDefault();
+              const text = event.clipboardData.getData("text");
+              setPassword(filterPasswordInput(text));
+            }}
             autoComplete="current-password"
+            spellCheck={false}
             placeholder="••••••••"
           />
         </div>
-        <button className="btn btn-primary auth-form__submit" disabled={loading} type="submit">
+        <button
+          className="btn btn-primary auth-form__submit"
+          disabled={loading}
+          type="submit"
+        >
           {loading ? "Connexion…" : "Se connecter"}
         </button>
       </form>
