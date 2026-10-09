@@ -1,35 +1,14 @@
 import Link from "next/link";
+import {
+  LandingHeroVisual,
+  type LandingOrgShowcase,
+} from "@/components/landing-hero-visual";
 
-function HeroVisual() {
-  return (
-    <div className="landing-visual" aria-hidden>
-      <div className="landing-visual__glow" />
-      <div className="landing-visual__device">
-        <div className="landing-visual__notch" />
-        <div className="landing-visual__screen">
-          <p className="landing-visual__channel">WhatsApp · Succursale Kinshasa</p>
-          <div className="landing-visual__bubble landing-visual__bubble--in">
-            Bonjour {"{{name}}"}, votre HLX 150 est prêt en concession.
-          </div>
-          <div className="landing-visual__bubble landing-visual__bubble--media">
-            <span className="landing-visual__media-bar" />
-            <span>Promo week-end · image + 2 liens</span>
-          </div>
-          <div className="landing-visual__bubble landing-visual__bubble--sms">
-            SMS · Rappels &amp; confirmations
-          </div>
-          <div className="landing-visual__status">
-            <span>1 248 destinataires</span>
-            <span className="landing-visual__dot" />
-            <span>En cours</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function LandingPage() {
+export function LandingPage({
+  organizations,
+}: {
+  organizations: LandingOrgShowcase[];
+}) {
   return (
     <div className="landing">
       <header className="landing-top">
@@ -44,7 +23,7 @@ export function LandingPage() {
           <p className="landing-hero__brand">Campagnes</p>
           <h1 className="landing-hero__title">
             WhatsApp &amp; SMS
-            <span className="landing-hero__title-line">pour chaque succursale</span>
+            <span className="landing-hero__title-line">pour chaque entreprise</span>
           </h1>
           <p className="landing-hero__lead">
             Une plateforme pour préparer, cibler et envoyer vos messages clients —
@@ -56,7 +35,7 @@ export function LandingPage() {
             </Link>
           </div>
         </div>
-        <HeroVisual />
+        <LandingHeroVisual organizations={organizations} />
       </section>
 
       <section className="landing-solution">
@@ -64,7 +43,7 @@ export function LandingPage() {
           <h2>L’idée de la solution</h2>
           <p>
             Centralisez l’audience, les templates et les envois multicanaux.
-            Chaque succursale pilote ses campagnes sans perdre la cohérence
+            Chaque entreprise pilote ses campagnes sans perdre la cohérence
             de marque.
           </p>
         </div>

@@ -1,0 +1,104 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export type LandingOrgShowcase = {
+  id: string;
+  name: string;
+  contacts: number;
+  campaigns: number;
+  messagesOk: number;
+  messagesFailed: number;
+};
+
+function formatCount(n: number) {
+  return new Intl.NumberFormat("fr-FR").format(n);
+}
+
+export function LandingHeroVisual({
+  organizations,
+}: {
+  organizations: LandingOrgShowcase[];
+}) {
+  const items =
+    organizations.length > 0
+      ? organizations
+      : [
+          {
+            id: "fallback",
+            name: "Votre entreprise",
+            contacts: 0,
+            campaigns: 0,
+            messagesOk: 0,
+            messagesFailed: 0,
+          },
+        ];
+
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (items.length < 2) return;
+    const id = window.setInterval(() => {
+      setIndex((prev) => (prev + 1) % items.length);
+    }, 3200);
+    return () => window.clearInterval(id);
+  }, [items.length]);
+
+  const org = items[index] ?? items[0]!;
+  const totalMessages = org.messagesOk + org.messagesFailed;
+
+  return (
+    <div className="landing-visual" aria-hidden>
+      <div className="landing-visual__glow" />
+      <div className="landing-visual__device">
+        <div className="landing-visual__notch" />
+        <div className="landing-visual__screen">
+          <div key={org.id} className="landing-visual__cycle">
+            <p className="landing-visual__channel">
+              WhatsApp · Entreprise
+            </p>
+            <p className="landing-visual__org">{org.name}</p>
+
+            <div className="landing-visual__bubble landing-visual__bubble--in">
+              Bonjour {"{{name}}"}, votre HLX 150 est prêt en concession.
+            </div>
+            <div className="landing-visual__bubble landing-visual__bubble--media">
+              <span className="landing-visual__media-bar" />
+              <span>Promo week-end · image + 2 liens</span>
+            </div>
+            <div className="landing-visual__bubble landing-visual__bubble--sms">
+              SMS · Rappels &amp; confirmations
+            </div>
+
+            <div className="landing-visual__consumption">
+              <div>
+                <span className="landing-visual__metric-label">Contacts</span>
+                <strong>{formatCount(org.contacts)}</strong>
+              </div>
+              <div>
+                <span className="landing-visual__metric-label">Campagnes</span>
+                <strong>{formatCount(org.campaigns)}</strong>
+              </div>
+              <div>
+                <span className="landing-visual__metric-label">Messages OK</span>
+                <strong>{formatCount(org.messagesOk)}</strong>
+              </div>
+              <div>
+                <span className="landing-visual__metric-label">Échoués</span>
+                <strong>{formatCount(org.messagesFailed)}</strong>
+              </div>
+            </div>
+
+            <div className="landing-visual__status">
+              <span>{formatCount(totalMessages)} messages</span>
+              <span className="landing-visual__dot" />
+              <span>
+                {index + 1}/{items.length}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
