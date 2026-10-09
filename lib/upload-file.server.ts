@@ -178,5 +178,5 @@ export async function resolveUploadAbsolutePath(
 
 export async function readUploadBuffer(storagePath: string): Promise<Buffer> {
   const absolute = await resolveUploadAbsolutePath(storagePath);
-  return fs.readFile(absolute);
+  return fs.readFile(/*turbopackIgnore: true*/ absolute);
 }
