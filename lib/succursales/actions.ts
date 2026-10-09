@@ -69,10 +69,11 @@ export async function createTenantOrganization(input: {
         buffer: Buffer.from(logoB64, "base64"),
       });
       logoPath = saved.relativePath;
-      await prisma.tenantOrganization.update({
-        where: { id: tenant.id },
-        data: { logoPath },
-      });
+      await prisma.$executeRaw`
+        UPDATE "tenant_organization"
+        SET "logoPath" = ${logoPath}
+        WHERE "id" = ${tenant.id}
+      `;
     }
     await prisma.tenantMember.upsert({
       where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },

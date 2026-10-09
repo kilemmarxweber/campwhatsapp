@@ -135,9 +135,19 @@ export async function exportContactsExcel(input: {
 
   const org = await prisma.organization.findFirst({
     where: { id: input.organizationId },
-    include: { tenant: { select: { name: true, logoPath: true } } },
+    include: { tenant: { select: { id: true, name: true } } },
   });
   if (!org?.tenant) throw new Error("Succursale introuvable");
+
+  let logoPath: string | null = null;
+  try {
+    const logoRows = await prisma.$queryRaw<
+      { logoPath: string | null }[]
+    >`SELECT "logoPath" FROM "tenant_organization" WHERE "id" = ${org.tenant.id} LIMIT 1`;
+    logoPath = logoRows[0]?.logoPath ?? null;
+  } catch {
+    logoPath = null;
+  }
 
   const contacts = await prisma.contact.findMany({
     where: { organizationId: input.organizationId },
@@ -155,7 +165,7 @@ export async function exportContactsExcel(input: {
     tenantName: org.tenant.name,
     branchName: org.name,
     exportedAt,
-    logoPath: org.tenant.logoPath,
+    logoPath,
   });
 
   const stamp = exportedAt.toISOString().slice(0, 10);
