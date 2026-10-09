@@ -13,9 +13,6 @@ export function LandingPage({
     <div className="landing">
       <header className="landing-top">
         <p className="landing-top__brand">Campagnes</p>
-        <Link href="/auth/sign-in" className="landing-top__link">
-          Connexion
-        </Link>
       </header>
 
       <section className="landing-hero">
@@ -36,9 +33,27 @@ export function LandingPage({
           </div>
         </div>
         <LandingHeroVisual organizations={organizations} />
+        <a
+          href="#landing-suite"
+          className="landing-scroll"
+          aria-label="Lire plus"
+        >
+          <span className="landing-scroll__label">Lire plus</span>
+          <span className="landing-scroll__arrow" aria-hidden>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+              <path
+                d="M12 5v14M5 12l7 7 7-7"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </a>
       </section>
 
-      <section className="landing-solution">
+      <section id="landing-suite" className="landing-solution">
         <div className="landing-solution__intro">
           <h2>L’idée de la solution</h2>
           <p>

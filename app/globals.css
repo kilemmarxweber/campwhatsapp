@@ -320,7 +320,7 @@
 .landing-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   max-width: 1120px;
   margin: 0 auto;
   padding: 1.25rem 1.5rem 0;
@@ -335,25 +335,15 @@
   color: white;
 }
 
-.landing-top__link {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--landing-muted);
-  transition: color 0.2s ease;
-}
-
-.landing-top__link:hover {
-  color: white;
-}
-
 .landing-hero {
+  position: relative;
   display: grid;
   gap: 2.5rem;
   align-items: center;
   max-width: 1120px;
   margin: 0 auto;
   min-height: calc(100svh - 4rem);
-  padding: 2rem 1.5rem 3.5rem;
+  padding: 2rem 1.5rem 4.5rem;
 }
 
 @media (min-width: 900px) {
@@ -362,6 +352,49 @@
     gap: 3rem;
     padding-top: 1rem;
   }
+}
+
+.landing-scroll {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  transform: translateX(-50%);
+  color: color-mix(in oklab, white 78%, #a8b4cc);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.landing-scroll:hover {
+  color: white;
+}
+
+.landing-scroll__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.landing-scroll__arrow {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, white 28%, transparent);
+  background: color-mix(in oklab, white 8%, transparent);
+  animation: landing-bounce 1.8s ease-in-out infinite;
+}
+
+.landing-scroll:focus-visible {
+  outline: 2px solid color-mix(in oklab, white 55%, transparent);
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
 .landing-hero__copy {
@@ -580,7 +613,14 @@
   margin: 0 auto;
   padding: 3.5rem 1.5rem 2rem;
   color: var(--fg);
+  scroll-margin-top: 1.5rem;
   background: linear-gradient(180deg, transparent, color-mix(in oklab, white 4%, transparent) 8%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.landing) {
+    scroll-behavior: smooth;
+  }
 }
 
 .landing-solution__intro {
@@ -756,6 +796,16 @@
   }
 }
 
+@keyframes landing-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-hero__copy,
   .landing-hero__btn,
@@ -763,7 +813,8 @@
   .landing-visual__bubble,
   .landing-visual__glow,
   .landing-visual__dot,
-  .landing-visual__cycle {
+  .landing-visual__cycle,
+  .landing-scroll__arrow {
     animation: none !important;
   }
 }
