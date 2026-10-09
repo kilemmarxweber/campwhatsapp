@@ -10,7 +10,6 @@ import {
   deleteContact,
   deleteContactList,
   importContactsFromExcel,
-  exportContactsExcel,
 } from "@/lib/contacts/actions";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { TablePagination } from "@/components/table-pagination";
@@ -25,27 +24,30 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   return btoa(binary);
 }
 
-function downloadExcelFile(base64: string, filename: string) {
-  const safeName = filename.toLowerCase().endsWith(".xlsx")
-    ? filename
-    : `${filename}.xlsx`;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+function triggerBlobDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = safeName;
+  a.download = filename;
   a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function filenameFromContentDisposition(header: string | null, fallback: string) {
+  if (!header) return fallback;
+  const utf = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1].trim());
+    } catch {
+      // keep fallback parsing
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || fallback;
 }
 
 export function ContactsClient({
@@ -288,13 +290,36 @@ export function ContactsClient({
             onClick={() => {
               startTransition(async () => {
                 try {
-                  const result = await exportContactsExcel({
-                    organizationId,
-                    orgSlug,
-                  });
-                  downloadExcelFile(result.base64, result.filename);
+                  const res = await fetch(
+                    `/api/o/${encodeURIComponent(orgSlug)}/contacts/export`,
+                    { method: "GET", credentials: "same-origin" },
+                  );
+                  if (!res.ok) {
+                    let message = "Export échoué";
+                    try {
+                      const body = (await res.json()) as { message?: string };
+                      if (body.message) message = body.message;
+                    } catch {
+                      // ignore
+                    }
+                    throw new Error(message);
+                  }
+                  const blob = await res.blob();
+                  if (blob.size < 32) {
+                    throw new Error("Fichier export vide — réessayez");
+                  }
+                  const stamp = new Date().toISOString().slice(0, 10);
+                  const filename = filenameFromContentDisposition(
+                    res.headers.get("Content-Disposition"),
+                    `contacts-${orgSlug}-${stamp}.xlsx`,
+                  );
+                  triggerBlobDownload(blob, filename);
+                  const countHeader = res.headers.get("X-Contacts-Count");
+                  const count = countHeader ? Number(countHeader) : totalContacts;
                   toast.success(
-                    `${result.count} contact(s) exporté(s)`,
+                    Number.isFinite(count)
+                      ? `${count} contact(s) exporté(s)`
+                      : "Export téléchargé",
                   );
                 } catch (err) {
                   toast.error(
