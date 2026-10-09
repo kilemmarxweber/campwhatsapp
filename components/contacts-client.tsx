@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   createContact,
@@ -9,9 +10,11 @@ import {
   deleteContact,
   deleteContactList,
   importContactsFromExcel,
+  exportContactsExcel,
 } from "@/lib/contacts/actions";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { TablePagination } from "@/components/table-pagination";
+import { Button } from "@/components/ui/button";
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -20,6 +23,29 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
     binary += String.fromCharCode(bytes[i]!);
   }
   return btoa(binary);
+}
+
+function downloadExcelFile(base64: string, filename: string) {
+  const safeName = filename.toLowerCase().endsWith(".xlsx")
+    ? filename
+    : `${filename}.xlsx`;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = safeName;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function ContactsClient({
@@ -107,13 +133,15 @@ export function ContactsClient({
           <h2 className="font-medium">Import Excel</h2>
           <p className="text-sm text-[var(--fg-muted)]">
             Colonnes : <code>phone</code> (obligatoire), <code>name</code>,{" "}
-            <code>email</code>, plus variables libres.
+            <code>email</code>, plus variables. Exportez d’abord via l’icône du
+            tableau pour obtenir le modèle.
           </p>
           <input
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={(e) => {
-              const file = e.target.files?.[0];
+              const input = e.currentTarget;
+              const file = input.files?.[0];
               if (!file) return;
               const reader = new FileReader();
               reader.onload = () => {
@@ -136,6 +164,8 @@ export function ContactsClient({
                     toast.error(
                       err instanceof Error ? err.message : "Import échoué",
                     );
+                  } finally {
+                    input.value = "";
                   }
                 });
               };
@@ -246,6 +276,37 @@ export function ContactsClient({
       </div>
 
       <div className="surface overflow-x-auto">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+          <h2 className="font-medium">Tableau des contacts</h2>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={pending}
+            title="Exporter Excel"
+            aria-label="Exporter les contacts en Excel"
+            onClick={() => {
+              startTransition(async () => {
+                try {
+                  const result = await exportContactsExcel({
+                    organizationId,
+                    orgSlug,
+                  });
+                  downloadExcelFile(result.base64, result.filename);
+                  toast.success(
+                    `${result.count} contact(s) exporté(s)`,
+                  );
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error ? err.message : "Export échoué",
+                  );
+                }
+              });
+            }}
+          >
+            <DownloadIcon />
+          </Button>
+        </div>
         {contacts.length === 0 && totalContacts === 0 ? (
           <div className="p-8 text-center text-[var(--fg-muted)]">
             Aucun contact — ajoutez-en un ou importez un Excel pour démarrer.

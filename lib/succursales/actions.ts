@@ -17,13 +17,20 @@ import { sendMemberCreatedEmail } from "@/lib/email/send-member-created";
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset";
 import { sendProfileUpdatedEmail } from "@/lib/email/send-profile-updated";
 import { generateSecurePassword } from "@/lib/generate-password";
+import { writeTenantLogo } from "@/lib/upload-file.server";
 import { ORG_ROLE, APP_ROLE, isOwnerOrgRole } from "@/lib/permissions";
 import {
   seedSystemGlobalRoles,
   syncAllGlobalRolesToOrg,
 } from "@/lib/roles/sync";
 
-export async function createTenantOrganization(input: { name: string; slug: string }) {
+export async function createTenantOrganization(input: {
+  name: string;
+  slug: string;
+  logoBase64?: string;
+  logoFilename?: string;
+  logoMimeType?: string;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { ok: false as const, message: "Non authentifié" };
   const access = await getGovernanceContext(session.user.id, session.user.role);
@@ -37,8 +44,36 @@ export async function createTenantOrganization(input: { name: string; slug: stri
   const existing = await prisma.tenantOrganization.findUnique({ where: { slug } });
   if (existing) return { ok: false as const, message: "Ce slug d'organisation existe déjà" };
 
+  let logoPath: string | null = null;
+  const logoB64 = input.logoBase64?.trim();
+  if (logoB64) {
+    const mime = input.logoMimeType?.trim() || "image/png";
+    if (!/^image\/(png|jpeg|jpg|webp)$/i.test(mime)) {
+      return {
+        ok: false as const,
+        message: "Logo : PNG, JPEG ou WebP uniquement",
+      };
+    }
+    const buf = Buffer.from(logoB64, "base64");
+    if (buf.byteLength > 2_000_000) {
+      return { ok: false as const, message: "Logo trop volumineux (max 2 Mo)" };
+    }
+  }
+
   try {
     const tenant = await prisma.tenantOrganization.create({ data: { name, slug } });
+    if (logoB64) {
+      const saved = await writeTenantLogo({
+        tenantId: tenant.id,
+        filename: input.logoFilename?.trim() || "logo.png",
+        buffer: Buffer.from(logoB64, "base64"),
+      });
+      logoPath = saved.relativePath;
+      await prisma.tenantOrganization.update({
+        where: { id: tenant.id },
+        data: { logoPath },
+      });
+    }
     await prisma.tenantMember.upsert({
       where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
       create: { tenantId: tenant.id, userId: session.user.id, role: TENANT_ROLE.OWNER },

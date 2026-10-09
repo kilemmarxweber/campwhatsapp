@@ -59,12 +59,12 @@ export default async function OrganisationsPage() {
               count === 1 ? "1 succursale" : `${count} succursales`;
             return (
               <li key={tenant.id}>
-                <Card className="h-full">
+                <Card className="relative h-full transition-colors hover:bg-muted/40">
                   <CardHeader>
                     <CardTitle>
                       <Link
                         href={`/organisations/${tenant.slug}`}
-                        className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+                        className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:ring-3 focus-visible:ring-ring"
                       >
                         {tenant.name}
                       </Link>
@@ -74,15 +74,17 @@ export default async function OrganisationsPage() {
                       {tenant.archivedAt ? <Badge variant="outline">Archivée</Badge> : null}
                       <Badge variant="secondary">{label}</Badge>
                       {isOwner ? (
-                        <RecordActions
-                          kind="organisation"
-                          id={tenant.id}
-                          name={tenant.name}
-                          slug={tenant.slug}
-                          archived={Boolean(tenant.archivedAt)}
-                        />
+                        <div className="relative z-10">
+                          <RecordActions
+                            kind="organisation"
+                            id={tenant.id}
+                            name={tenant.name}
+                            slug={tenant.slug}
+                            archived={Boolean(tenant.archivedAt)}
+                          />
+                        </div>
                       ) : (
-                        <ChevronRightIcon className="size-4 text-muted-foreground" />
+                        <ChevronRightIcon className="relative z-0 size-4 text-muted-foreground" />
                       )}
                     </CardAction>
                   </CardHeader>

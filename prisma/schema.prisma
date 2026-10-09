@@ -109,6 +109,8 @@ model TenantOrganization {
   id         String          @id @default(cuid())
   name       String
   slug       String          @unique
+  /// Chemin relatif sous UPLOAD_DIR (tenants/…) — utilisé surtout pour l’export Excel contacts
+  logoPath   String?
   colorRed   String          @default("#dc4226")
   colorWhite String          @default("#ffffff")
   colorBlue  String          @default("#253c80")

@@ -92,6 +92,22 @@ export async function ensureUploadDirectory(): Promise<string> {
  * Écrit un fichier sous `{UPLOAD_DIR}/{orgId}/{safeName}`.
  * Retourne le chemin relatif stocké en base (posix).
  */
+/** Logo organisation (tenant) — `tenants/{tenantId}/…` */
+export async function writeTenantLogo(input: {
+  tenantId: string;
+  filename: string;
+  buffer: Buffer;
+}): Promise<{ relativePath: string; absolutePath: string }> {
+  const root = await ensureUploadDirectory();
+  const ext = path.extname(input.filename) || ".png";
+  const safeName = `logo${ext.replace(/[^\w.]/g, "")}`;
+  const relativePath = path.posix.join("tenants", input.tenantId, safeName);
+  const absolutePath = path.join(root, "tenants", input.tenantId, safeName);
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, input.buffer);
+  return { relativePath, absolutePath };
+}
+
 export async function writeOrgUpload(input: {
   organizationId: string;
   filename: string;

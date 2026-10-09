@@ -67,7 +67,10 @@ export default async function OrganisationSuccursalesPage({
             {[...tenant.branches]
               .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt)))
               .map((branch) => (
-              <li key={branch.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <li
+                key={branch.id}
+                className="relative flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/40"
+              >
                 {branch.archivedAt ? (
                   <div className="min-w-0">
                     <p className="truncate font-medium text-muted-foreground">{branch.name}</p>
@@ -76,7 +79,7 @@ export default async function OrganisationSuccursalesPage({
                 ) : (
                   <Link
                     href={`/o/${branch.slug}`}
-                    className="min-w-0 flex-1 rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+                    className="min-w-0 flex-1 rounded-sm outline-none after:absolute after:inset-0 focus-visible:ring-3 focus-visible:ring-ring"
                   >
                     <p className="truncate font-medium text-foreground">{branch.name}</p>
                     <p className="truncate text-sm text-muted-foreground">/{branch.slug}</p>
@@ -87,13 +90,15 @@ export default async function OrganisationSuccursalesPage({
                   <span className="hidden sm:inline">{branch._count.members} membres</span>
                   <span className="hidden sm:inline">{branch._count.contacts} contacts</span>
                   <span>{branch._count.campaigns} campagnes</span>
-                  <RecordActions
-                    kind="succursale"
-                    id={branch.id}
-                    name={branch.name}
-                    slug={branch.slug}
-                    archived={Boolean(branch.archivedAt)}
-                  />
+                  <div className="relative z-10">
+                    <RecordActions
+                      kind="succursale"
+                      id={branch.id}
+                      name={branch.name}
+                      slug={branch.slug}
+                      archived={Boolean(branch.archivedAt)}
+                    />
+                  </div>
                   {branch.archivedAt ? null : <ChevronRightIcon className="size-4" />}
                 </div>
               </li>

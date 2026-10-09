@@ -7,6 +7,7 @@ import { requireOrganizationPermission } from "@/lib/auth/organization-permissio
 import { getDefaultCountryForBranch } from "@/lib/klambo/org";
 import { normalizePhone } from "@/lib/phone";
 import { parseContactsExcel } from "@/lib/contacts/import-excel";
+import { buildContactsWorkbook } from "@/lib/contacts/export-excel";
 
 export async function createContact(input: {
   organizationId: string;
@@ -122,6 +123,49 @@ export async function importContactsFromExcel(input: {
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
   return { created, updated, errors, filename: input.filename };
+}
+
+export async function exportContactsExcel(input: {
+  organizationId: string;
+  orgSlug: string;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["read"],
+  });
+
+  const org = await prisma.organization.findFirst({
+    where: { id: input.organizationId },
+    include: { tenant: { select: { name: true, logoPath: true } } },
+  });
+  if (!org?.tenant) throw new Error("Succursale introuvable");
+
+  const contacts = await prisma.contact.findMany({
+    where: { organizationId: input.organizationId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      phone: true,
+      name: true,
+      email: true,
+      variables: true,
+    },
+  });
+
+  const exportedAt = new Date();
+  const buffer = await buildContactsWorkbook(contacts, {
+    tenantName: org.tenant.name,
+    branchName: org.name,
+    exportedAt,
+    logoPath: org.tenant.logoPath,
+  });
+
+  const stamp = exportedAt.toISOString().slice(0, 10);
+  const filename = `contacts-${input.orgSlug}-${stamp}.xlsx`;
+
+  return {
+    filename,
+    base64: buffer.toString("base64"),
+    count: contacts.length,
+  };
 }
 
 export async function createContactList(input: {
