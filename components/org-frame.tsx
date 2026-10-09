@@ -100,6 +100,7 @@ export function OrgFrame({
             { href: base, label: copy.nav.overview },
             { href: `${base}/contacts`, label: copy.nav.contacts },
             { href: `${base}/campaigns`, label: copy.nav.campaigns },
+            { href: `${base}/rapports`, label: copy.nav.reports },
             { href: `${base}/media`, label: copy.nav.media },
             { href: `${base}/templates`, label: copy.nav.templates },
             { href: `${base}/equipe`, label: copy.nav.team },

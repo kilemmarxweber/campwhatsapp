@@ -247,17 +247,19 @@ function ComparisonBars({
 export function OverviewMessageCharts({
   whatsapp,
   sms,
+  title = "Messages WhatsApp & SMS",
+  subtitle = "Volume des messages réussis et échoués par canal",
 }: {
   whatsapp: ChannelMessageStats;
   sms: ChannelMessageStats;
+  title?: string;
+  subtitle?: string;
 }) {
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-medium">Messages WhatsApp &amp; SMS</h2>
-        <p className="text-sm text-[var(--fg-muted)]">
-          Volume des messages réussis et échoués par canal
-        </p>
+        <h2 className="text-lg font-medium">{title}</h2>
+        <p className="text-sm text-[var(--fg-muted)]">{subtitle}</p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <ChannelCard
