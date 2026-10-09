@@ -749,6 +749,8 @@ export async function updateTemplate(input: {
   });
   const approvalStale =
     existing.body !== input.body ||
+    existing.messageType !== messageType ||
+    (existing.mediaId ?? null) !== (messageType === "text" ? null : input.mediaId || null) ||
     (existing.infobipTemplateName ?? null) !== infobip.infobipTemplateName ||
     existing.infobipLanguage !== infobip.infobipLanguage;
 

@@ -63,6 +63,8 @@ function infobipStatusLabel(status: string | null | undefined) {
       return "en attente";
     case "REJECTED":
       return "refusé";
+    case "EXISTING":
+      return "enregistré";
     default:
       return status ? status.toLowerCase() : "";
   }
@@ -208,16 +210,50 @@ export function TemplatesClient({
           e.preventDefault();
           startTransition(async () => {
             try {
+              let templateId = editingId;
               if (editingId) {
                 await updateTemplate({ ...payload, templateId: editingId });
                 toast.success("Template mis à jour");
               } else {
-                await createTemplate(payload);
+                const created = await createTemplate(payload);
+                templateId = created.id;
                 toast.success(
                   channel === "sms"
                     ? "Template SMS créé"
                     : "Template WhatsApp créé",
                 );
+              }
+              const withMedia =
+                usesInfobip &&
+                !editingId &&
+                (messageType === "image" || messageType === "video");
+              if (withMedia && templateId) {
+                if (!payload.mediaId) {
+                  setSubmitError(
+                    "Choisissez une image ou une vidéo. Elle part avec le modèle pour l'approbation.",
+                  );
+                } else {
+                  const result = await submitInfobipWhatsappTemplate({
+                    organizationId,
+                    orgSlug,
+                    templateId,
+                    body: payload.body,
+                    infobipTemplateName: payload.infobipTemplateName,
+                    infobipLanguage: payload.infobipLanguage,
+                    messageType: payload.messageType,
+                    mediaId: payload.mediaId,
+                  });
+                  if (!result.ok) {
+                    resetForm();
+                    setSubmitError(result.message);
+                    toast.error(result.message);
+                    router.refresh();
+                    return;
+                  }
+                  toast.success(
+                    `Modèle soumis (${infobipStatusLabel(result.status)})`,
+                  );
+                }
               }
               resetForm();
               router.refresh();
@@ -338,6 +374,14 @@ export function TemplatesClient({
               <p className="rounded-md bg-[var(--tvs-blue-soft)]/40 px-3 py-2 font-mono text-sm">
                 {infobipBody.text || "Le texte envoyé à WhatsApp apparaîtra ici."}
               </p>
+              {messageType === "image" || messageType === "video" ? (
+                <p className="text-sm text-[var(--fg-muted)]">
+                  {messageType === "image" ? "L'image" : "La vidéo"} est
+                  obligatoire pour l&apos;approbation. Elle part dans
+                  l&apos;en-tête, depuis le dossier médias du VPS
+                  (/var/www/api-uploads), sur une adresse https publique.
+                </p>
+              ) : null}
               {infobipBody.keys.length > 0 ? (
                 <p className="text-xs text-[var(--fg-muted)]">
                   {infobipBody.keys
@@ -367,6 +411,8 @@ export function TemplatesClient({
                         body: payload.body,
                         infobipTemplateName: payload.infobipTemplateName,
                         infobipLanguage: payload.infobipLanguage,
+                        messageType: payload.messageType,
+                        mediaId: payload.mediaId,
                       });
                       if (!result.ok) {
                         setSubmitError(result.message);

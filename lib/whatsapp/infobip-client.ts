@@ -47,8 +47,16 @@ export async function sendInfobipWhatsappTemplate(input: {
   templateName: string;
   language: string;
   placeholders: string[];
+  header?: { type: "IMAGE" | "VIDEO"; mediaUrl: string };
 }) {
   const messageId = randomUUID();
+  const templateData: {
+    body: { placeholders: string[] };
+    header?: { type: "IMAGE" | "VIDEO"; mediaUrl: string };
+  } = {
+    body: { placeholders: input.placeholders },
+  };
+  if (input.header) templateData.header = input.header;
   const res = await fetch(
     `${input.baseUrl.replace(/\/$/, "")}/whatsapp/1/message/template`,
     {
@@ -62,9 +70,7 @@ export async function sendInfobipWhatsappTemplate(input: {
             messageId,
             content: {
               templateName: input.templateName,
-              templateData: {
-                body: { placeholders: input.placeholders },
-              },
+              templateData,
               language: input.language,
             },
           },
@@ -121,7 +127,14 @@ export async function createInfobipWhatsappTemplate(input: {
   language: string;
   bodyText: string;
   examples: string[];
+  header?: { format: "IMAGE" | "VIDEO"; example: string };
 }) {
+  const body = input.examples.length
+    ? { text: input.bodyText, examples: input.examples }
+    : { text: input.bodyText };
+  const structure = input.header
+    ? { header: input.header, body, type: "MEDIA" as const }
+    : { body, type: "TEXT" as const };
   const res = await fetch(
     `${input.baseUrl.replace(/\/$/, "")}/whatsapp/2/senders/${encodeURIComponent(input.sender)}/templates`,
     {
@@ -131,12 +144,7 @@ export async function createInfobipWhatsappTemplate(input: {
         name: input.name,
         language: input.language,
         category: "MARKETING",
-        structure: {
-          body: input.examples.length
-            ? { text: input.bodyText, examples: input.examples }
-            : { text: input.bodyText },
-          type: "TEXT",
-        },
+        structure,
       }),
     },
   );

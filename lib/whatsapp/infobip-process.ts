@@ -6,6 +6,10 @@ import {
 import { InfobipSmsError } from "@/lib/sms/client";
 import { getInfobipWhatsappCredentials } from "@/lib/whatsapp/config";
 import { sendInfobipWhatsappTemplate } from "@/lib/whatsapp/infobip-client";
+import {
+  absoluteUploadUrl,
+  isInfobipReachableMediaUrl,
+} from "@/lib/whatsapp/media-url";
 
 function contactVars(contact: {
   name: string | null;
@@ -34,6 +38,7 @@ export async function processInfobipWhatsappCampaign(campaignId: string) {
     where: { id: campaignId },
     include: {
       organization: { select: { tenantId: true } },
+      media: true,
       recipients: {
         where: { status: { in: ["pending", "failed"] } },
         include: { contact: true },
@@ -76,6 +81,42 @@ export async function processInfobipWhatsappCampaign(campaignId: string) {
     throw err;
   }
 
+  const wantsMedia =
+    campaign.messageType === "image" || campaign.messageType === "video";
+  let header: { type: "IMAGE" | "VIDEO"; mediaUrl: string } | undefined;
+  if (wantsMedia) {
+    if (!campaign.media) {
+      const error = "Un média est requis pour ce modèle WhatsApp.";
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "failed", completedAt: new Date() },
+      });
+      await prisma.campaignRecipient.updateMany({
+        where: { campaignId, status: { in: ["pending", "queued", "failed"] } },
+        data: { status: "failed", error },
+      });
+      throw new Error(error);
+    }
+    const mediaUrl = absoluteUploadUrl(campaign.media.storagePath);
+    if (!isInfobipReachableMediaUrl(mediaUrl)) {
+      const error =
+        "Infobip ne peut pas télécharger ce média : il doit être servi en https public, pas depuis cet ordinateur.";
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "failed", completedAt: new Date() },
+      });
+      await prisma.campaignRecipient.updateMany({
+        where: { campaignId, status: { in: ["pending", "queued", "failed"] } },
+        data: { status: "failed", error },
+      });
+      throw new Error(error);
+    }
+    header = {
+      type: campaign.messageType === "image" ? "IMAGE" : "VIDEO",
+      mediaUrl,
+    };
+  }
+
   await prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "sending", startedAt: campaign.startedAt ?? new Date() },
@@ -108,6 +149,7 @@ export async function processInfobipWhatsappCampaign(campaignId: string) {
         templateName,
         language,
         placeholders,
+        header,
       });
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },

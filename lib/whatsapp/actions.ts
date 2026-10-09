@@ -21,6 +21,10 @@ import {
   assertInfobipBaseUrl,
 } from "@/lib/sms/validate";
 import {
+  absoluteUploadUrl,
+  isInfobipReachableMediaUrl,
+} from "@/lib/whatsapp/media-url";
+import {
   assertWhatsappFrom,
   assertWhatsappLanguage,
   assertWhatsappTemplateName,
@@ -162,6 +166,8 @@ export async function submitInfobipWhatsappTemplate(input: {
   body: string;
   infobipTemplateName?: string | null;
   infobipLanguage?: string | null;
+  messageType?: "text" | "image" | "video";
+  mediaId?: string | null;
 }): Promise<{ ok: true; status: string; name: string } | { ok: false; message: string }> {
   try {
     await requireOrganizationPermission(input.organizationId, { templates: ["update"] });
@@ -221,6 +227,27 @@ export async function submitInfobipWhatsappTemplate(input: {
     select: { name: true, phone: true, email: true },
   });
   const examples = converted.keys.map((key) => exampleForKey(key, sample));
+  const messageType = input.messageType ?? "text";
+  let header: { format: "IMAGE" | "VIDEO"; example: string } | undefined;
+  let mediaId: string | null = null;
+  if (messageType === "image" || messageType === "video") {
+    if (!input.mediaId) {
+      return { ok: false, message: "Choisissez une image ou une vidéo avant de soumettre le modèle." };
+    }
+    const media = await prisma.mediaAsset.findFirst({
+      where: { id: input.mediaId, organizationId: input.organizationId },
+      select: { id: true, kind: true, storagePath: true },
+    });
+    if (!media || media.kind !== messageType) {
+      return { ok: false, message: "Le média ne correspond pas au type du modèle." };
+    }
+    const example = absoluteUploadUrl(media.storagePath);
+    header = {
+      format: messageType === "image" ? "IMAGE" : "VIDEO",
+      example,
+    };
+    mediaId = media.id;
+  }
 
   try {
     const created = await createInfobipWhatsappTemplate({
@@ -231,12 +258,15 @@ export async function submitInfobipWhatsappTemplate(input: {
       language,
       bodyText: converted.text,
       examples,
+      header,
     });
     const status = created.status ?? "PENDING";
     await prisma.messageTemplate.update({
       where: { id: template.id },
       data: {
         body: input.body,
+        messageType,
+        mediaId,
         infobipTemplateName: created.name ?? name,
         infobipLanguage: created.language ?? language,
         infobipTemplateId: created.id ?? null,
@@ -247,9 +277,13 @@ export async function submitInfobipWhatsappTemplate(input: {
     return { ok: true, status, name: created.name ?? name };
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Infobip a refusé le modèle.";
+    const localMedia =
+      header && !isInfobipReachableMediaUrl(header.example)
+        ? " Le fichier choisi est servi en local : WhatsApp a besoin d'une adresse https publique pour vérifier le média."
+        : "";
     const message = /template creation or modification .* forbidden/i.test(raw)
-      ? "Infobip refuse la création de modèles sur ce numéro expéditeur. Le numéro de test n'autorise souvent que le modèle déjà approuvé. Utilisez un numéro WhatsApp Business qui permet de gérer les modèles, ou créez le modèle dans le portail Infobip puis indiquez son nom ici."
-      : raw;
+      ? `Infobip refuse la création de modèles sur ce numéro expéditeur. Le numéro de test n'autorise souvent que le modèle déjà approuvé. Utilisez un numéro WhatsApp Business qui permet de gérer les modèles, ou créez le modèle dans le portail Infobip puis indiquez son nom ici.${localMedia}`
+      : `${raw}${localMedia}`;
     return { ok: false, message };
   }
 }
@@ -266,9 +300,12 @@ export async function refreshInfobipWhatsappTemplate(input: {
   }
   const template = await prisma.messageTemplate.findFirst({
     where: { id: input.templateId, organizationId: input.organizationId },
-    select: { infobipTemplateId: true },
+    select: { infobipTemplateId: true, infobipTemplateStatus: true },
   });
   if (!template?.infobipTemplateId) {
+    if (template?.infobipTemplateStatus === "EXISTING") {
+      return { ok: true, status: "EXISTING" };
+    }
     return { ok: false, message: "Ce modèle n'a pas encore été soumis à Infobip." };
   }
   const branch = await prisma.organization.findUnique({
