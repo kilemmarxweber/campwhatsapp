@@ -550,6 +550,101 @@
   font-weight: 700;
 }
 
+/* Soft-lock session (inactivité) */
+.session-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  background: color-mix(in oklab, #0b1f33 42%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.session-lock-dialog {
+  width: min(calc(100vw - 1.5rem), 26rem);
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow:
+    0 18px 40px color-mix(in oklab, #0b1f33 22%, transparent),
+    0 2px 8px color-mix(in oklab, #0b1f33 10%, transparent);
+}
+
+.session-lock-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.session-lock-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--tvs-blue);
+  color: #fff;
+}
+
+.session-lock-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.session-lock-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--fg-muted);
+}
+
+.session-lock-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem 1.15rem;
+}
+
+.session-lock-email {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-lock-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #dc2626;
+}
+
+.session-lock-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding-top: 0.15rem;
+}
+
+@media (max-width: 400px) {
+  .session-lock-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field input,
 .field textarea,
 .field select {

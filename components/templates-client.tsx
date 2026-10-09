@@ -28,6 +28,7 @@ import {
   applyTextStyle,
   type TextStyle,
 } from "@/components/message-card-preview";
+import { RequiredMark } from "@/components/required-mark";
 
 type Media = { id: string; filename: string; kind: string; storagePath?: string };
 
@@ -289,7 +290,10 @@ export function TemplatesClient({
           </div>
 
           <div className="field">
-            <label htmlFor="tpl-name">Nom</label>
+            <label htmlFor="tpl-name">
+              Nom
+              <RequiredMark />
+            </label>
             <input
               id="tpl-name"
               required
@@ -301,16 +305,23 @@ export function TemplatesClient({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="field">
-              <label htmlFor="tpl-channel">Canal</label>
-              <select id="tpl-channel" value={channel} onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); if (next === "sms") { setMessageType("text"); setMediaId(""); } }}>
+              <label htmlFor="tpl-channel">
+                Canal
+                <RequiredMark />
+              </label>
+              <select id="tpl-channel" required value={channel} onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); if (next === "sms") { setMessageType("text"); setMediaId(""); } }}>
                 <option value="whatsapp">WhatsApp</option>
                 <option value="sms">SMS</option>
               </select>
             </div>
             <div className="field">
-              <label htmlFor="tpl-type">Type</label>
+              <label htmlFor="tpl-type">
+                Type
+                <RequiredMark />
+              </label>
               <select
                 id="tpl-type"
+                required
                 value={messageType}
                 disabled={channel === "sms"}
                 onChange={(e) => {
@@ -325,7 +336,7 @@ export function TemplatesClient({
               </select>
             </div>
             {channel === "whatsapp" ? <div className="field">
-              <label htmlFor="tpl-style">Style du texte</label>
+              <label htmlFor="tpl-style">Style du texte (optionnel)</label>
               <select
                 id="tpl-style"
                 value={textStyle}
@@ -342,7 +353,9 @@ export function TemplatesClient({
             <div className="flex flex-col gap-3 rounded-lg border border-[var(--border)] p-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="field">
-                  <label htmlFor="tpl-infobip-name">Nom du modèle WhatsApp</label>
+                  <label htmlFor="tpl-infobip-name">
+                    Nom du modèle WhatsApp (optionnel)
+                  </label>
                   <input
                     id="tpl-infobip-name"
                     value={infobipTemplateName}
@@ -355,7 +368,10 @@ export function TemplatesClient({
                   </p>
                 </div>
                 <div className="field">
-                  <label htmlFor="tpl-infobip-lang">Langue du modèle</label>
+                  <label htmlFor="tpl-infobip-lang">
+                    Langue du modèle
+                    <RequiredMark />
+                  </label>
                   <select
                     id="tpl-infobip-lang"
                     value={infobipLanguage}
@@ -473,7 +489,10 @@ export function TemplatesClient({
 
           {channel === "whatsapp" && (messageType === "image" || messageType === "video") && (
             <div className="field">
-              <label htmlFor="tpl-media">Média</label>
+              <label htmlFor="tpl-media">
+                Média
+                <RequiredMark />
+              </label>
               <select
                 id="tpl-media"
                 required
@@ -495,6 +514,7 @@ export function TemplatesClient({
           <div className="field">
             <label htmlFor="tpl-body">
               Texte (variables {"{{name}}"}, {"{{phone}}"}, …)
+              <RequiredMark />
             </label>
             <textarea
               id="tpl-body"
@@ -520,7 +540,7 @@ export function TemplatesClient({
 
           <div className="space-y-3">
             <p className="text-xs font-medium tracking-wide text-[var(--fg-muted)] uppercase">
-              Liens (1 ou 2)
+              Liens (optionnel — 1 ou 2)
             </p>
             <div className="flex flex-wrap gap-2">
               {APP_LINKS.map((link) => (
@@ -542,7 +562,7 @@ export function TemplatesClient({
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="field">
-                <label htmlFor="tpl-l1-label">Lien 1 — libellé</label>
+                <label htmlFor="tpl-l1-label">Lien 1 — libellé (optionnel)</label>
                 <input
                   id="tpl-l1-label"
                   value={link1Label}
@@ -551,7 +571,7 @@ export function TemplatesClient({
                 />
               </div>
               <div className="field">
-                <label htmlFor="tpl-l1-url">Lien 1 — URL</label>
+                <label htmlFor="tpl-l1-url">Lien 1 — URL (optionnel)</label>
                 <input
                   id="tpl-l1-url"
                   type="url"

@@ -8,6 +8,7 @@ import {
   type PhoneCountryOption,
 } from "@/lib/phone-countries";
 import { checkNationalPhone, digitsOnly } from "@/lib/phone";
+import { RequiredMark } from "@/components/required-mark";
 import type { CountryCode } from "libphonenumber-js";
 
 export type PhoneInputValue = {
@@ -88,12 +89,7 @@ export function PhoneInputField({
     <div className={fieldClass} ref={rootRef}>
       <label htmlFor={id}>
         {label}
-        {required ? (
-          <span className="field-required" aria-hidden>
-            {" "}
-            *
-          </span>
-        ) : null}
+        {required ? <RequiredMark /> : null}
       </label>
       <div className="phone-input-row">
         <button

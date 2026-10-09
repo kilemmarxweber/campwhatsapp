@@ -12,6 +12,7 @@ import {
   renderTemplate,
 } from "@/lib/campaigns/render-template";
 import { MessageCardPreview } from "@/components/message-card-preview";
+import { RequiredMark } from "@/components/required-mark";
 
 type Contact = {
   id: string;
@@ -219,8 +220,11 @@ export function CampaignForm({
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(280px,340px)]">
         <div className="surface flex flex-col gap-4 p-5">
           <div className="field">
-            <label htmlFor="campaign-channel">Canal</label>
-            <select id="campaign-channel" value={channel} disabled={isEdit} onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); setTemplateId(templates.find((t) => t.channel === next)?.id ?? ""); }}>
+            <label htmlFor="campaign-channel">
+              Canal
+              <RequiredMark />
+            </label>
+            <select id="campaign-channel" value={channel} disabled={isEdit} required onChange={(e) => { const next = e.target.value as "whatsapp" | "sms"; setChannel(next); setTemplateId(templates.find((t) => t.channel === next)?.id ?? ""); }}>
               <option value="whatsapp">WhatsApp</option>
               <option value="sms">SMS</option>
             </select>
@@ -228,10 +232,7 @@ export function CampaignForm({
           <div className="field">
             <label htmlFor="campaign-name">
               Nom de la campagne
-              <span className="field-required" aria-hidden>
-                {" "}
-                *
-              </span>
+              <RequiredMark />
             </label>
             <input
               id="campaign-name"
@@ -245,10 +246,7 @@ export function CampaignForm({
           <div className="field">
             <label htmlFor="campaign-template">
               Template {channel === "sms" ? "SMS (texte et liens)" : "WhatsApp (image + style + liens)"}
-              <span className="field-required" aria-hidden>
-                {" "}
-                *
-              </span>
+              <RequiredMark />
             </label>
             <select
               id="campaign-template"
@@ -368,7 +366,10 @@ export function CampaignForm({
       </div>
 
       <div className="surface p-5">
-        <h2 className="mb-3 font-medium">Audience</h2>
+        <h2 className="mb-3 font-medium">
+          Audience
+          <RequiredMark />
+        </h2>
         <div className="field mb-4">
           <label htmlFor="campaign-list">Groupe (optionnel)</label>
           <select
@@ -385,24 +386,31 @@ export function CampaignForm({
           </select>
         </div>
         {!listId && (
-          <div className="max-h-64 overflow-auto rounded-lg border border-[var(--border)]">
-            {contacts.map((c) => (
-              <label
-                key={c.id}
-                className="flex cursor-pointer items-center gap-3 border-b border-[var(--border)] px-3 py-2 text-sm last:border-0"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.id)}
-                  onChange={() => toggle(c.id)}
-                />
-                <span className="text-[var(--fg)]">{c.name || "Sans nom"}</span>
-                <span className="font-mono text-[var(--fg-muted)]">
-                  {c.phone}
-                </span>
-              </label>
-            ))}
-          </div>
+          <>
+            <p className="mb-2 text-sm text-[var(--fg-muted)]">
+              Contacts
+              <RequiredMark />
+              <span className="ml-1">— cochez au moins un destinataire</span>
+            </p>
+            <div className="max-h-64 overflow-auto rounded-lg border border-[var(--border)]">
+              {contacts.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex cursor-pointer items-center gap-3 border-b border-[var(--border)] px-3 py-2 text-sm last:border-0"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(c.id)}
+                    onChange={() => toggle(c.id)}
+                  />
+                  <span className="text-[var(--fg)]">{c.name || "Sans nom"}</span>
+                  <span className="font-mono text-[var(--fg-muted)]">
+                    {c.phone}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
