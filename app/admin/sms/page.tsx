@@ -3,17 +3,19 @@ import prisma from "@/lib/prisma";
 
 export default async function AdminSmsPage() {
   const tenants = await prisma.tenantOrganization.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: {
       id: true,
       name: true,
       infobipSms: { select: { sender: true, baseUrl: true } },
       branches: {
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         take: 1,
         select: { slug: true },
       },
-      _count: { select: { branches: true } },
+      _count: { select: { branches: { where: { archivedAt: null } } } },
     },
   });
 

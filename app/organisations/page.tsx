@@ -5,6 +5,7 @@ import { ChevronRightIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getGovernanceContext } from "@/lib/auth/governance";
 import { AddOrganizationButton } from "@/components/create-organization-form";
+import { RecordActions } from "@/components/record-actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -50,27 +51,42 @@ export default async function OrganisationsPage() {
         </Card>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {access.tenants.map((tenant) => {
+          {[...access.tenants]
+            .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt)))
+            .map((tenant) => {
             const count = tenant.branches.length;
             const label =
               count === 1 ? "1 succursale" : `${count} succursales`;
             return (
               <li key={tenant.id}>
-                <Link
-                  href={`/organisations/${tenant.slug}`}
-                  className="block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring"
-                >
-                  <Card className="h-full transition-shadow hover:ring-primary/40">
-                    <CardHeader>
-                      <CardTitle>{tenant.name}</CardTitle>
-                      <CardDescription>/{tenant.slug}</CardDescription>
-                      <CardAction className="flex items-center gap-2">
-                        <Badge variant="secondary">{label}</Badge>
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>
+                      <Link
+                        href={`/organisations/${tenant.slug}`}
+                        className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+                      >
+                        {tenant.name}
+                      </Link>
+                    </CardTitle>
+                    <CardDescription>/{tenant.slug}</CardDescription>
+                    <CardAction className="flex items-center gap-2">
+                      {tenant.archivedAt ? <Badge variant="outline">Archivée</Badge> : null}
+                      <Badge variant="secondary">{label}</Badge>
+                      {isOwner ? (
+                        <RecordActions
+                          kind="organisation"
+                          id={tenant.id}
+                          name={tenant.name}
+                          slug={tenant.slug}
+                          archived={Boolean(tenant.archivedAt)}
+                        />
+                      ) : (
                         <ChevronRightIcon className="size-4 text-muted-foreground" />
-                      </CardAction>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                      )}
+                    </CardAction>
+                  </CardHeader>
+                </Card>
               </li>
             );
           })}

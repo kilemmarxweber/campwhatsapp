@@ -88,6 +88,7 @@ model Organization {
   createdAt         DateTime
   metadata          String?
   tenantId          String
+  archivedAt        DateTime?
   tenant            TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   invitations       Invitation[]
   members           Member[]
@@ -113,6 +114,7 @@ model TenantOrganization {
   colorBlue  String          @default("#253c80")
   locale            String               @default("fr")
   whatsappProvider  String               @default("klambo")
+  archivedAt        DateTime?
   createdAt         DateTime             @default(now())
   branches          Organization[]
   members           TenantMember[]

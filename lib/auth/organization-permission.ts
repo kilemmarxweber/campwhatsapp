@@ -161,11 +161,13 @@ export async function getOrganizationBySlug(slug: string) {
       name: true,
       slug: true,
       logo: true,
+      archivedAt: true,
       tenant: {
         select: {
           id: true,
           name: true,
           slug: true,
+          archivedAt: true,
           colorRed: true,
           colorWhite: true,
           colorBlue: true,

@@ -70,11 +70,15 @@ export function WhatsappProviderSettings({
   const configured = initial.configured && Boolean(initial.apiKey);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap gap-2">
+    <div className="flex w-full max-w-4xl flex-col gap-6">
+      <div className="flex w-full flex-wrap gap-2 rounded-lg border border-[var(--border)] bg-[var(--tvs-blue-soft)]/35 p-1">
         <button
           type="button"
-          className={provider === "klambo" ? "btn btn-primary" : "btn btn-ghost"}
+          className={
+            provider === "klambo"
+              ? "btn btn-primary flex-1"
+              : "btn btn-ghost flex-1"
+          }
           disabled={pending}
           onClick={() => choose("klambo")}
         >
@@ -82,7 +86,11 @@ export function WhatsappProviderSettings({
         </button>
         <button
           type="button"
-          className={provider === "infobip" ? "btn btn-primary" : "btn btn-ghost"}
+          className={
+            provider === "infobip"
+              ? "btn btn-primary flex-1"
+              : "btn btn-ghost flex-1"
+          }
           disabled={pending}
           onClick={() => choose("infobip")}
         >
@@ -93,8 +101,8 @@ export function WhatsappProviderSettings({
       {provider === "klambo" ? klambo : null}
 
       {provider === "infobip" ? (
-        <div className="flex max-w-2xl flex-col gap-6">
-          <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full max-w-4xl flex-col gap-6">
+          <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div>
               <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
                 État de la connexion
@@ -111,7 +119,7 @@ export function WhatsappProviderSettings({
           </div>
 
           <form
-            className="surface flex flex-col gap-6 p-6"
+            className="surface flex flex-col gap-6 p-6 sm:p-7"
             onSubmit={(event) => {
               event.preventDefault();
               startTransition(async () => {

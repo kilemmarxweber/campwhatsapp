@@ -115,7 +115,7 @@ export function SettingsView({
       <div
         role="tablist"
         aria-label={copy.settings.title}
-        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/60 p-1"
+        className="flex w-full max-w-4xl gap-1 overflow-x-auto rounded-lg border border-border bg-muted/60 p-1"
       >
         <SettingsTab
           id="appearance"
@@ -149,7 +149,7 @@ export function SettingsView({
         id="settings-panel-appearance"
         role="tabpanel"
         aria-labelledby="settings-tab-appearance"
-        className="surface flex max-w-xl flex-col gap-6 p-6"
+        className="surface flex w-full max-w-4xl flex-col gap-6 p-6 sm:p-7"
         onSubmit={(event) => {
           event.preventDefault();
           if (!canManage) return;
@@ -260,14 +260,14 @@ export function SettingsView({
         id="whatsapp"
         role="tabpanel"
         aria-labelledby="settings-tab-whatsapp"
-        className="flex flex-col gap-4"
+        className="flex w-full max-w-4xl flex-col gap-4"
       >
         <div>
           <h2 className="text-xl font-semibold text-primary">{copy.settings.whatsappTitle}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{copy.settings.whatsappBody}</p>
         </div>
         {klambo.corrupt || infobipWhatsapp.keyCorrupt ? (
-          <p className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
             Une clé API enregistrée ne peut plus être déchiffrée. Collez-la à
             nouveau et enregistrez.
           </p>
@@ -308,7 +308,7 @@ export function SettingsView({
         id="sms"
         role="tabpanel"
         aria-labelledby="settings-tab-sms"
-        className="flex flex-col gap-4"
+        className="flex w-full max-w-4xl flex-col gap-4"
       >
         <div>
           <h2 className="text-xl font-semibold text-primary">SMS</h2>
@@ -317,7 +317,7 @@ export function SettingsView({
           </p>
         </div>
         {sms.keyCorrupt ? (
-          <p className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
             La clé API enregistrée ne peut plus être déchiffrée. Collez-la à
             nouveau et enregistrez.
           </p>
@@ -364,7 +364,7 @@ function SettingsTab({
       aria-selected={selected}
       aria-controls={`settings-panel-${id}`}
       className={cn(
-        "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors",
+        "inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm whitespace-nowrap transition-colors",
         selected
           ? "bg-primary text-primary-foreground shadow-sm"
           : "text-muted-foreground hover:bg-background hover:text-foreground",

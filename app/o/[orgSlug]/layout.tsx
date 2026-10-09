@@ -24,6 +24,11 @@ export default async function OrgLayout({
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
 
+  const governance = await getGovernanceLevel(session.user.id, session.user.role);
+  if (org.archivedAt || org.tenant?.archivedAt) {
+    redirect(governance ? "/organisations" : "/dashboard");
+  }
+
   try {
     await requireOrgMembership(org.id);
   } catch {
@@ -38,7 +43,6 @@ export default async function OrgLayout({
     .catch(() => undefined);
 
   const isSiege = isAppAdminRole(session.user.role);
-  const governance = await getGovernanceLevel(session.user.id, session.user.role);
 
   return (
     <OrgFrame

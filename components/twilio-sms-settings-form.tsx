@@ -45,8 +45,8 @@ export function InfobipSmsSettingsForm({
   const configured = initial.configured && Boolean(initial.apiKey);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex w-full max-w-4xl flex-col gap-6">
+      <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
           <p className="text-sm font-medium text-[var(--tvs-blue-deep)]">
             État de la connexion
@@ -63,7 +63,7 @@ export function InfobipSmsSettingsForm({
       </div>
 
       <form
-        className="surface flex flex-col gap-6 p-6"
+        className="surface flex flex-col gap-6 p-6 sm:p-7"
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {

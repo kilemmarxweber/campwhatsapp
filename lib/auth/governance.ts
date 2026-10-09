@@ -10,10 +10,12 @@ export type GovernanceTenant = {
   id: string;
   name: string;
   slug: string;
+  archivedAt: Date | null;
   branches: Array<{
     id: string;
     name: string;
     slug: string;
+    archivedAt: Date | null;
     _count: { members: number; contacts: number; campaigns: number };
   }>;
 };
@@ -28,6 +30,7 @@ const branchSelect = {
   id: true,
   name: true,
   slug: true,
+  archivedAt: true,
   _count: { select: { members: true, contacts: true, campaigns: true } },
 } as const;
 
@@ -114,6 +117,7 @@ export async function getGovernanceContext(
       id: true,
       name: true,
       slug: true,
+      archivedAt: true,
       branches: { orderBy: { name: "asc" }, select: branchSelect },
     },
   });

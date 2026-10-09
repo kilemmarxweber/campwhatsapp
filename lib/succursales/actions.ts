@@ -96,6 +96,9 @@ export async function createSuccursale(input: {
     ? await prisma.tenantOrganization.findUnique({ where: { id: input.tenantId } })
     : await prisma.tenantOrganization.create({ data: { name: tenantName, slug: tenantSlug } });
   if (!tenant) throw new Error("Organisation introuvable");
+  if (tenant.archivedAt) {
+    throw new Error("Cette organisation est archivée. Restaurez-la avant d'ajouter une succursale.");
+  }
 
   const created = await auth.api.createOrganization({
     headers: await headers(),
@@ -472,4 +475,228 @@ export async function resetMemberPassword(input: {
   }
 
   revalidatePath(`/o/${input.orgSlug}/equipe`);
+}
+
+type ActionResult = { ok: true } | { ok: false; message: string };
+
+function normalizeRecordSlug(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 48);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null;
+  return slug;
+}
+
+async function managerContext() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) return { ok: false as const, message: "Non authentifié" };
+  const access = await getGovernanceContext(session.user.id, session.user.role);
+  if (!access) {
+    return { ok: false as const, message: "Accès refusé" };
+  }
+  return { ok: true as const, access };
+}
+
+function refreshOrgLists(slug?: string) {
+  revalidatePath("/organisations");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/klambo");
+  revalidatePath("/admin/sms");
+  if (slug) revalidatePath(`/organisations/${slug}`);
+}
+
+async function deleteBranchById(branchId: string) {
+  await prisma.session.updateMany({
+    where: { activeOrganizationId: branchId },
+    data: { activeOrganizationId: null },
+  });
+  await prisma.organization.delete({ where: { id: branchId } });
+}
+
+export async function updateTenantOrganization(input: {
+  tenantId: string;
+  name: string;
+  slug: string;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  if (!canCreateOrganization(manager.access.level)) {
+    return { ok: false, message: "Seul le propriétaire peut modifier une organisation" };
+  }
+  const name = input.name.trim();
+  const slug = normalizeRecordSlug(input.slug);
+  if (!name || !slug) return { ok: false, message: "Nom et slug requis" };
+  const current = await prisma.tenantOrganization.findUnique({
+    where: { id: input.tenantId },
+    select: { id: true, slug: true },
+  });
+  if (!current) return { ok: false, message: "Organisation introuvable" };
+  const taken = await prisma.tenantOrganization.findFirst({
+    where: { slug, NOT: { id: current.id } },
+    select: { id: true },
+  });
+  if (taken) return { ok: false, message: "Ce slug d'organisation existe déjà" };
+  await prisma.tenantOrganization.update({
+    where: { id: current.id },
+    data: { name, slug },
+  });
+  refreshOrgLists(current.slug);
+  refreshOrgLists(slug);
+  return { ok: true };
+}
+
+export async function setTenantOrganizationArchived(input: {
+  tenantId: string;
+  archived: boolean;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  if (!canCreateOrganization(manager.access.level)) {
+    return { ok: false, message: "Seul le propriétaire peut archiver une organisation" };
+  }
+  const current = await prisma.tenantOrganization.findUnique({
+    where: { id: input.tenantId },
+    select: { slug: true },
+  });
+  if (!current) return { ok: false, message: "Organisation introuvable" };
+  await prisma.tenantOrganization.update({
+    where: { id: input.tenantId },
+    data: { archivedAt: input.archived ? new Date() : null },
+  });
+  refreshOrgLists(current.slug);
+  return { ok: true };
+}
+
+export async function deleteTenantOrganization(input: {
+  tenantId: string;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  if (!canCreateOrganization(manager.access.level)) {
+    return { ok: false, message: "Seul le propriétaire peut supprimer une organisation" };
+  }
+  const current = await prisma.tenantOrganization.findUnique({
+    where: { id: input.tenantId },
+    select: { id: true, slug: true, branches: { select: { id: true } } },
+  });
+  if (!current) return { ok: false, message: "Organisation introuvable" };
+  try {
+    for (const branch of current.branches) {
+      await deleteBranchById(branch.id);
+    }
+    await prisma.tenantOrganization.delete({ where: { id: current.id } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Suppression impossible";
+    return { ok: false, message };
+  }
+  refreshOrgLists(current.slug);
+  return { ok: true };
+}
+
+export async function updateSuccursale(input: {
+  branchId: string;
+  name: string;
+  slug: string;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  const name = input.name.trim();
+  const slug = normalizeRecordSlug(input.slug);
+  if (!name || !slug) return { ok: false, message: "Nom et slug requis" };
+  const current = await prisma.organization.findUnique({
+    where: { id: input.branchId },
+    select: { id: true, slug: true, tenantId: true, tenant: { select: { slug: true } } },
+  });
+  if (!current) return { ok: false, message: "Succursale introuvable" };
+  if (
+    !canCreateBranchInTenant({
+      level: manager.access.level,
+      tenantId: current.tenantId,
+      ownTenantIds: manager.access.tenantIds,
+    })
+  ) {
+    return { ok: false, message: "Vous ne pouvez modifier que les succursales de votre organisation" };
+  }
+  const taken = await prisma.organization.findFirst({
+    where: { slug, NOT: { id: current.id } },
+    select: { id: true },
+  });
+  if (taken) return { ok: false, message: "Ce slug de succursale existe déjà" };
+  await prisma.organization.update({
+    where: { id: current.id },
+    data: { name, slug },
+  });
+  refreshOrgLists(current.tenant.slug);
+  revalidatePath(`/o/${current.slug}`);
+  revalidatePath(`/o/${slug}`);
+  return { ok: true };
+}
+
+export async function setSuccursaleArchived(input: {
+  branchId: string;
+  archived: boolean;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  const current = await prisma.organization.findUnique({
+    where: { id: input.branchId },
+    select: { id: true, tenantId: true, tenant: { select: { slug: true } } },
+  });
+  if (!current) return { ok: false, message: "Succursale introuvable" };
+  if (
+    !canCreateBranchInTenant({
+      level: manager.access.level,
+      tenantId: current.tenantId,
+      ownTenantIds: manager.access.tenantIds,
+    })
+  ) {
+    return { ok: false, message: "Vous ne pouvez archiver que les succursales de votre organisation" };
+  }
+  if (input.archived) {
+    await prisma.session.updateMany({
+      where: { activeOrganizationId: current.id },
+      data: { activeOrganizationId: null },
+    });
+  }
+  await prisma.organization.update({
+    where: { id: current.id },
+    data: { archivedAt: input.archived ? new Date() : null },
+  });
+  refreshOrgLists(current.tenant.slug);
+  return { ok: true };
+}
+
+export async function deleteSuccursale(input: {
+  branchId: string;
+}): Promise<ActionResult> {
+  const manager = await managerContext();
+  if (!manager.ok) return manager;
+  const current = await prisma.organization.findUnique({
+    where: { id: input.branchId },
+    select: { id: true, slug: true, tenantId: true, tenant: { select: { slug: true } } },
+  });
+  if (!current) return { ok: false, message: "Succursale introuvable" };
+  if (
+    !canCreateBranchInTenant({
+      level: manager.access.level,
+      tenantId: current.tenantId,
+      ownTenantIds: manager.access.tenantIds,
+    })
+  ) {
+    return { ok: false, message: "Vous ne pouvez supprimer que les succursales de votre organisation" };
+  }
+  try {
+    await deleteBranchById(current.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Suppression impossible";
+    return { ok: false, message };
+  }
+  refreshOrgLists(current.tenant.slug);
+  revalidatePath(`/o/${current.slug}`);
+  return { ok: true };
 }

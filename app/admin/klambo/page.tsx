@@ -3,17 +3,19 @@ import prisma from "@/lib/prisma";
 
 export default async function AdminKlamboPage() {
   const tenants = await prisma.tenantOrganization.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: {
       id: true,
       name: true,
       klambo: { select: { id: true } },
       branches: {
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         take: 1,
         select: { slug: true, name: true },
       },
-      _count: { select: { branches: true } },
+      _count: { select: { branches: { where: { archivedAt: null } } } },
     },
   });
 

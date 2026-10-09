@@ -152,7 +152,10 @@ export async function getSessionOrganizationContext(
 
 export async function listUserOrganizations(userId: string) {
   const members = await prisma.member.findMany({
-    where: { userId },
+    where: {
+      userId,
+      organization: { archivedAt: null, tenant: { archivedAt: null } },
+    },
     orderBy: { createdAt: "asc" },
     select: {
       role: true,
