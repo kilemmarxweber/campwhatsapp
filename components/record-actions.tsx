@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArchiveIcon, ArchiveRestoreIcon, EllipsisIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -64,7 +66,7 @@ export function RecordActions({
   archived: boolean;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

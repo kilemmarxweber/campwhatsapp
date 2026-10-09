@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EllipsisIcon, KeyRoundIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -71,7 +73,7 @@ export function EquipeClient({
   canManage: boolean;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -275,7 +277,7 @@ function MemberActions({
   roles: RoleOption[];
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

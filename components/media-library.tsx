@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteMediaAsset } from "@/lib/campaigns/actions";
@@ -27,7 +27,7 @@ export function MediaLibrary({
   assets: Asset[];
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
 
   if (assets.length === 0) {
     return <p className="text-[var(--fg-muted)]">Aucun média</p>;

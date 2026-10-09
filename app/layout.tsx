@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { GlobalPendingOverlayHost } from "@/components/page-loader";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({
     >
       <body className="min-h-full antialiased">
         {children}
+        <GlobalPendingOverlayHost />
         <Toaster theme="light" richColors position="top-right" />
       </body>
     </html>

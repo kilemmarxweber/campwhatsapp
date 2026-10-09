@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -29,7 +31,7 @@ function slugify(value: string) {
 export function AddSuccursaleButton({ tenantId }: { tenantId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
 

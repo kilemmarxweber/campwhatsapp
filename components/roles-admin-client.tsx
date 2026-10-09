@@ -1,7 +1,9 @@
 "use client";
 
+import { usePendingOverlay } from "@/components/page-loader";
+
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   deleteGlobalRole,
@@ -36,7 +38,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 
 export function RolesAdminClient({ roles }: { roles: RoleRow[] }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [draft, setDraft] = useState<{
     id?: string;
     name: string;

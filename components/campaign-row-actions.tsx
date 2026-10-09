@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCampaign, resendCampaign } from "@/lib/campaigns/actions";
@@ -20,7 +20,7 @@ export function CampaignRowActions({
   status: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const canEdit = status !== "sending";
   const canResend = ["completed", "cancelled", "failed"].includes(status);
   const canDelete = status !== "sending";

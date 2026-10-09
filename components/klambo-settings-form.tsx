@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { saveKlamboSettings } from "@/lib/klambo/actions";
@@ -27,7 +28,7 @@ export function KlamboSettingsForm({
   webhookEndpoint: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [apiKey, setApiKey] = useState(initial.apiKey);
   const [showKey, setShowKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);

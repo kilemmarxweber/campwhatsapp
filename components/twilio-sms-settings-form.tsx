@@ -1,7 +1,9 @@
 "use client";
 
+import { usePendingOverlay } from "@/components/page-loader";
+
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { saveSmsSettings } from "@/lib/sms/actions";
@@ -30,7 +32,7 @@ export function InfobipSmsSettingsForm({
   };
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [apiKey, setApiKey] = useState(initial.apiKey);
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl || DEFAULT_INFOBIP_BASE_URL);
   const [sender, setSender] = useState(initial.sender || DEFAULT_INFOBIP_SENDER);

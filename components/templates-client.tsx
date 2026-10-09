@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -86,7 +87,7 @@ export function TemplatesClient({
   whatsappProvider?: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [body, setBody] = useState(DEFAULT_BODY);

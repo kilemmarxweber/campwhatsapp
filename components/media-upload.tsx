@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { toast } from "sonner";
 import { uploadMediaAsset } from "@/lib/campaigns/actions";
+import { usePendingOverlay } from "@/components/page-loader";
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -22,7 +22,7 @@ export function MediaUpload({
   orgSlug: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay("Envoi du média…");
 
   return (
     <div className="surface p-5">

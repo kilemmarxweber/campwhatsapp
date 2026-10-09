@@ -1,7 +1,9 @@
 "use client";
 
+import { usePendingOverlay } from "@/components/page-loader";
+
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -34,7 +36,7 @@ export function WhatsappProviderSettings({
   klambo: ReactNode;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [provider, setProvider] = useState<WhatsappProvider>(initial.provider);
   const [apiKey, setApiKey] = useState(initial.apiKey);
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl || DEFAULT_INFOBIP_WHATSAPP_BASE_URL);

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
+import { usePendingOverlay } from "@/components/page-loader";
 import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
 import {
   BASE_CONTACT_VARS,
@@ -69,7 +70,9 @@ export function CampaignForm({
   initial?: InitialCampaign;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay(
+    initial ? "Enregistrement…" : "Création…",
+  );
   const [name, setName] = useState(initial?.name ?? "");
   const [channel, setChannel] = useState<"whatsapp" | "sms">(initial?.channel ?? "whatsapp");
   const [templateId, setTemplateId] = useState(

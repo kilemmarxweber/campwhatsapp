@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KlamboSettingsForm } from "@/components/klambo-settings-form";
@@ -65,7 +67,7 @@ export function SettingsView({
 }) {
   const { copy, locale, setLocale, colors, setColors } = useOrgAppearance();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [red, setRed] = useState(colors.colorRed);
   const [white, setWhite] = useState(colors.colorWhite);
   const [blue, setBlue] = useState(colors.colorBlue);

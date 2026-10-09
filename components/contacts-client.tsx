@@ -1,7 +1,9 @@
 "use client";
 
+import { usePendingOverlay } from "@/components/page-loader";
+
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -75,7 +77,7 @@ export function ContactsClient({
   totalContacts: number;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [listName, setListName] = useState("");

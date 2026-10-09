@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { usePendingOverlay } from "@/components/page-loader";
 import { toast } from "sonner";
 import {
   cancelCampaign,
@@ -31,7 +31,7 @@ export function CampaignActions({
   failedCount: number;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, startTransition } = usePendingOverlay();
   const smsPendingProvider = channel === "sms" && !smsConfigured;
   const canResend =
     !smsPendingProvider && ["completed", "cancelled", "failed"].includes(status);
