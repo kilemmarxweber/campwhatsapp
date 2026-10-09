@@ -7,7 +7,7 @@ export default async function AdminSmsPage() {
     select: {
       id: true,
       name: true,
-      twilioSms: { select: { fromNumber: true } },
+      infobipSms: { select: { sender: true, baseUrl: true } },
       branches: {
         orderBy: { name: "asc" },
         take: 1,
@@ -24,7 +24,7 @@ export default async function AdminSmsPage() {
           SMS
         </h1>
         <p className="mt-1 text-[var(--fg-muted)]">
-          Chaque organisation a son compte Twilio. On le saisit une fois dans
+          Chaque organisation a sa clé Infobip. On la saisit une fois dans
           les paramètres d&apos;une succursale, pour toutes les autres.
         </p>
       </div>
@@ -36,7 +36,7 @@ export default async function AdminSmsPage() {
       ) : (
         <ul className="surface divide-y divide-[var(--border)]">
           {tenants.map((tenant) => {
-            const configured = Boolean(tenant.twilioSms);
+            const configured = Boolean(tenant.infobipSms);
             const href = tenant.branches[0]
               ? `/o/${tenant.branches[0].slug}/settings#sms`
               : null;
@@ -50,7 +50,7 @@ export default async function AdminSmsPage() {
                     {tenant._count.branches === 1
                       ? "1 succursale"
                       : `${tenant._count.branches} succursales`}
-                    {configured ? ` · ${tenant.twilioSms?.fromNumber}` : ""}
+                    {configured ? ` · ${tenant.infobipSms?.sender}` : ""}
                   </p>
                 </div>
                 <span className={configured ? "badge badge-ok" : "badge badge-warn"}>

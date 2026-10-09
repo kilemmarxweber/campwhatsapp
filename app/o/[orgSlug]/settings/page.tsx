@@ -7,7 +7,11 @@ import {
 import { getKlamboDefaults } from "@/lib/klambo/env";
 import { decryptSecret, maskApiKey } from "@/lib/crypto";
 import { getKlamboConfig } from "@/lib/klambo/org";
-import { isTwilioSmsConfigured, loadTwilioSmsFormState } from "@/lib/sms/config";
+import { isSmsConfigured, loadSmsFormState } from "@/lib/sms/config";
+import {
+  DEFAULT_INFOBIP_BASE_URL,
+  DEFAULT_INFOBIP_SENDER,
+} from "@/lib/sms/validate";
 
 export default async function OrgSettingsPage({
   params,
@@ -45,14 +49,14 @@ export default async function OrgSettingsPage({
   }
 
   const sms = canManage
-    ? await loadTwilioSmsFormState(org.tenant.id)
+    ? await loadSmsFormState(org.tenant.id)
     : {
-        accountSid: "",
-        authToken: "",
-        authTokenMasked: null,
-        fromNumber: "",
-        configured: await isTwilioSmsConfigured(org.tenant.id),
-        tokenCorrupt: false,
+        apiKey: "",
+        apiKeyMasked: null,
+        baseUrl: DEFAULT_INFOBIP_BASE_URL,
+        sender: DEFAULT_INFOBIP_SENDER,
+        configured: await isSmsConfigured(org.tenant.id),
+        keyCorrupt: false,
       };
 
   const appUrl =

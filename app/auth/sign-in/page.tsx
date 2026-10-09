@@ -57,19 +57,20 @@ export default function SignInPage() {
   async function onFirstLogin(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
+    const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl");
     const result = await completeFirstLoginPasswordAction({
       currentPassword,
       newPassword,
       confirmPassword,
+      callbackUrl,
     });
-    setLoading(false);
     if (!result.ok) {
+      setLoading(false);
       toast.error(result.message);
       return;
     }
     toast.success("Mot de passe enregistré");
-    router.push("/dashboard");
-    router.refresh();
+    window.location.assign(result.path);
   }
 
   return (

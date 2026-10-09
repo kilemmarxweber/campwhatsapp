@@ -4,21 +4,21 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { assertCanEditTenantChannels } from "@/lib/auth/tenant-channel-access";
 import { encryptSecret } from "@/lib/crypto";
-import { verifyTwilioSmsAccount } from "@/lib/sms/client";
-import { getTwilioSmsConfig, getTwilioSmsCredentials } from "@/lib/sms/config";
+import { verifyInfobipAccount } from "@/lib/sms/client";
+import { getSmsConfig, getSmsCredentials } from "@/lib/sms/config";
 import {
-  assertTwilioAccountSid,
-  assertTwilioAuthToken,
-  assertTwilioFromNumber,
+  assertInfobipApiKey,
+  assertInfobipBaseUrl,
+  assertInfobipSender,
 } from "@/lib/sms/validate";
 
-export async function saveTwilioSmsSettings(input: {
+export async function saveSmsSettings(input: {
   tenantId: string;
   organizationId: string;
   orgSlug: string;
-  accountSid: string;
-  authToken?: string;
-  fromNumber: string;
+  apiKey?: string;
+  baseUrl: string;
+  sender: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
     await assertCanEditTenantChannels(input.tenantId, input.organizationId);
@@ -37,12 +37,12 @@ export async function saveTwilioSmsSettings(input: {
     return { ok: false, message: "Organisation introuvable" };
   }
 
-  const existing = await getTwilioSmsConfig(tenant.id);
-  let accountSid: string;
-  let fromNumber: string;
+  const existing = await getSmsConfig(tenant.id);
+  let baseUrl: string;
+  let sender: string;
   try {
-    accountSid = assertTwilioAccountSid(input.accountSid);
-    fromNumber = assertTwilioFromNumber(input.fromNumber);
+    baseUrl = assertInfobipBaseUrl(input.baseUrl);
+    sender = assertInfobipSender(input.sender);
   } catch (err) {
     return {
       ok: false,
@@ -50,49 +50,47 @@ export async function saveTwilioSmsSettings(input: {
     };
   }
 
-  const tokenInput = input.authToken?.trim() ?? "";
-  let authToken = tokenInput;
+  const keyInput = input.apiKey?.trim() ?? "";
+  let apiKey = keyInput;
   try {
-    if (tokenInput) {
-      authToken = assertTwilioAuthToken(tokenInput);
-    } else if (existing?.authTokenEnc) {
-      authToken = (await getTwilioSmsCredentials(tenant.id)).authToken;
+    if (keyInput) {
+      apiKey = assertInfobipApiKey(keyInput);
+    } else if (existing?.apiKeyEnc) {
+      apiKey = (await getSmsCredentials(tenant.id)).apiKey;
     } else {
       return {
         ok: false,
-        message: "Collez un Auth Token pour la première configuration",
+        message: "Collez une clé API pour la première configuration",
       };
     }
   } catch (err) {
     return {
       ok: false,
-      message: err instanceof Error ? err.message : "Auth Token invalide",
+      message: err instanceof Error ? err.message : "Clé API invalide",
     };
   }
 
   try {
-    await verifyTwilioSmsAccount({ accountSid, authToken, fromNumber });
+    await verifyInfobipAccount({ apiKey, baseUrl });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, message: `Compte Twilio refusé : ${msg}` };
+    return { ok: false, message: `Compte Infobip refusé : ${msg}` };
   }
 
-  const authTokenEnc = tokenInput
-    ? encryptSecret(authToken)
-    : existing!.authTokenEnc;
+  const apiKeyEnc = keyInput ? encryptSecret(apiKey) : existing!.apiKeyEnc;
 
-  await prisma.twilioSmsConfig.upsert({
+  await prisma.infobipSmsConfig.upsert({
     where: { tenantId: tenant.id },
     create: {
       tenantId: tenant.id,
-      accountSid,
-      authTokenEnc,
-      fromNumber,
+      apiKeyEnc,
+      baseUrl,
+      sender,
     },
     update: {
-      accountSid,
-      authTokenEnc,
-      fromNumber,
+      apiKeyEnc,
+      baseUrl,
+      sender,
     },
   });
 

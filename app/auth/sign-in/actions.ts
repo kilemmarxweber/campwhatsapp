@@ -3,13 +3,15 @@
 import { headers } from "next/headers";
 import { APIError } from "better-auth/api";
 import { auth } from "@/lib/auth";
+import { resolvePostLoginPath } from "@/lib/auth/post-login-redirect";
 import prisma from "@/lib/prisma";
 
 export async function completeFirstLoginPasswordAction(input: {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+  callbackUrl?: string | null;
+}): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
   const currentPassword = input.currentPassword;
   const newPassword = input.newPassword.trim();
   const confirmPassword = input.confirmPassword;
@@ -41,7 +43,7 @@ export async function completeFirstLoginPasswordAction(input: {
       body: {
         currentPassword,
         newPassword,
-        revokeOtherSessions: true,
+        revokeOtherSessions: false,
       },
       headers: await headers(),
     });
@@ -64,5 +66,10 @@ export async function completeFirstLoginPasswordAction(input: {
     data: { mustChangePassword: false },
   });
 
-  return { ok: true };
+  const path = await resolvePostLoginPath(
+    session.user.id,
+    session.user.role,
+    input.callbackUrl,
+  );
+  return { ok: true, path };
 }

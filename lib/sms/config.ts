@@ -1,70 +1,74 @@
 import prisma from "@/lib/prisma";
 import { decryptSecret, maskApiKey } from "@/lib/crypto";
+import {
+  DEFAULT_INFOBIP_BASE_URL,
+  DEFAULT_INFOBIP_SENDER,
+} from "@/lib/sms/validate";
 
-export async function getTwilioSmsConfig(tenantId: string) {
-  return prisma.twilioSmsConfig.findUnique({
+export async function getSmsConfig(tenantId: string) {
+  return prisma.infobipSmsConfig.findUnique({
     where: { tenantId },
   });
 }
 
-export async function isTwilioSmsConfigured(tenantId: string) {
-  const row = await getTwilioSmsConfig(tenantId);
-  return Boolean(row?.accountSid && row.authTokenEnc && row.fromNumber);
+export async function isSmsConfigured(tenantId: string) {
+  const row = await getSmsConfig(tenantId);
+  return Boolean(row?.apiKeyEnc && row.baseUrl && row.sender);
 }
 
-export async function isTwilioSmsConfiguredForBranch(organizationId: string) {
+export async function isSmsConfiguredForBranch(organizationId: string) {
   const branch = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: { tenantId: true },
   });
   if (!branch?.tenantId) return false;
-  return isTwilioSmsConfigured(branch.tenantId);
+  return isSmsConfigured(branch.tenantId);
 }
 
-export async function getTwilioSmsCredentials(tenantId: string) {
-  const settings = await getTwilioSmsConfig(tenantId);
-  if (!settings?.accountSid || !settings.authTokenEnc || !settings.fromNumber) {
+export async function getSmsCredentials(tenantId: string) {
+  const settings = await getSmsConfig(tenantId);
+  if (!settings?.apiKeyEnc || !settings.baseUrl || !settings.sender) {
     throw new Error(
-      "SMS Twilio non configuré pour cette organisation. Ouvrez l'organisation et enregistrez son compte Twilio.",
+      "SMS Infobip non configuré pour cette organisation. Enregistrez la clé API et l'URL de base dans Paramètres.",
     );
   }
-  let authToken: string;
+  let apiKey: string;
   try {
-    authToken = decryptSecret(settings.authTokenEnc);
+    apiKey = decryptSecret(settings.apiKeyEnc);
   } catch (err) {
     throw new Error(
-      "Auth Token Twilio illisible. Ré-enregistrez-le sur l'organisation.",
+      "Clé API Infobip illisible. Ré-enregistrez-la dans Paramètres.",
       { cause: err },
     );
   }
   return {
-    accountSid: settings.accountSid,
-    authToken,
-    fromNumber: settings.fromNumber,
+    apiKey,
+    baseUrl: settings.baseUrl,
+    sender: settings.sender,
   };
 }
 
-export async function loadTwilioSmsFormState(tenantId: string) {
-  const row = await getTwilioSmsConfig(tenantId);
-  let authToken = "";
-  let authTokenMasked: string | null = null;
-  let tokenCorrupt = false;
-  if (row?.authTokenEnc) {
+export async function loadSmsFormState(tenantId: string) {
+  const row = await getSmsConfig(tenantId);
+  let apiKey = "";
+  let apiKeyMasked: string | null = null;
+  let keyCorrupt = false;
+  if (row?.apiKeyEnc) {
     try {
-      authToken = decryptSecret(row.authTokenEnc);
-      authTokenMasked = maskApiKey(authToken);
+      apiKey = decryptSecret(row.apiKeyEnc);
+      apiKeyMasked = maskApiKey(apiKey);
     } catch {
-      authToken = "";
-      authTokenMasked = null;
-      tokenCorrupt = true;
+      apiKey = "";
+      apiKeyMasked = null;
+      keyCorrupt = true;
     }
   }
   return {
-    accountSid: row?.accountSid ?? "",
-    authToken,
-    authTokenMasked,
-    fromNumber: row?.fromNumber ?? "",
-    configured: Boolean(authToken && row?.accountSid && row.fromNumber),
-    tokenCorrupt,
+    apiKey,
+    apiKeyMasked,
+    baseUrl: row?.baseUrl ?? DEFAULT_INFOBIP_BASE_URL,
+    sender: row?.sender ?? DEFAULT_INFOBIP_SENDER,
+    configured: Boolean(apiKey && row?.baseUrl && row.sender),
+    keyCorrupt,
   };
 }

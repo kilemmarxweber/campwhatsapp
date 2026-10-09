@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { renderTemplate } from "@/lib/campaigns/render-template";
-import { sendTwilioSms, TwilioSmsError } from "@/lib/sms/client";
-import { getTwilioSmsCredentials } from "@/lib/sms/config";
+import { sendInfobipSms, InfobipSmsError } from "@/lib/sms/client";
+import { getSmsCredentials } from "@/lib/sms/config";
 
 const SMS_MAX_LENGTH = 1600;
 
@@ -29,18 +29,18 @@ function contactVars(contact: {
 
 function isRateLimit(err: unknown) {
   return (
-    err instanceof TwilioSmsError &&
-    (err.status === 429 || /rate limit|20429/i.test(err.message))
+    err instanceof InfobipSmsError &&
+    (err.status === 429 || /too many requests|throttl/i.test(err.message))
   );
 }
 
 function isAuthFailure(err: unknown) {
   return (
-    err instanceof TwilioSmsError && (err.status === 401 || err.status === 403)
+    err instanceof InfobipSmsError && (err.status === 401 || err.status === 403)
   );
 }
 
-/** Envoi d'une campagne SMS via Twilio. Le canal WhatsApp n'est pas concerné. */
+/** Envoi d'une campagne SMS via Infobip. Le canal WhatsApp n'est pas concerné. */
 export async function processSmsCampaign(campaignId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
@@ -56,11 +56,11 @@ export async function processSmsCampaign(campaignId: string) {
   if (!campaign || campaign.channel !== "sms") return;
   if (campaign.status === "cancelled") return;
 
-  let credentials: Awaited<ReturnType<typeof getTwilioSmsCredentials>>;
+  let credentials: Awaited<ReturnType<typeof getSmsCredentials>>;
   try {
-    credentials = await getTwilioSmsCredentials(campaign.organization.tenantId);
+    credentials = await getSmsCredentials(campaign.organization.tenantId);
   } catch (err) {
-    const error = err instanceof Error ? err.message : "SMS Twilio non configuré.";
+    const error = err instanceof Error ? err.message : "SMS Infobip non configuré.";
     await prisma.campaign.update({
       where: { id: campaignId },
       data: { status: "failed", completedAt: new Date() },
@@ -110,18 +110,18 @@ export async function processSmsCampaign(campaignId: string) {
     });
 
     try {
-      const result = await sendTwilioSms({
-        accountSid: credentials.accountSid,
-        authToken: credentials.authToken,
-        from: credentials.fromNumber,
+      const result = await sendInfobipSms({
+        apiKey: credentials.apiKey,
+        baseUrl: credentials.baseUrl,
+        sender: credentials.sender,
         to: recipient.contact.phone,
-        body,
+        text: body,
       });
       await prisma.campaignRecipient.update({
         where: { id: recipient.id },
         data: {
           status: "sent",
-          klamboMessageId: result.sid,
+          klamboMessageId: result.messageId,
           sentAt: new Date(),
           error: null,
           renderedBody: body,

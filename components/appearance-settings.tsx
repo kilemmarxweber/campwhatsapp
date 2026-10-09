@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KlamboSettingsForm } from "@/components/klambo-settings-form";
-import { TwilioSmsSettingsForm } from "@/components/twilio-sms-settings-form";
+import { InfobipSmsSettingsForm } from "@/components/twilio-sms-settings-form";
 import { updateTenantAppearance } from "@/lib/appearance/actions";
 import {
   DEFAULT_COLORS,
@@ -43,12 +43,12 @@ export function SettingsView({
     corrupt: boolean;
   };
   sms: {
-    accountSid: string;
-    authToken: string;
-    authTokenMasked: string | null;
-    fromNumber: string;
+    apiKey: string;
+    apiKeyMasked: string | null;
+    baseUrl: string;
+    sender: string;
     configured: boolean;
-    tokenCorrupt: boolean;
+    keyCorrupt: boolean;
   };
 }) {
   const { copy, locale, setLocale, colors, setColors } = useOrgAppearance();
@@ -286,17 +286,17 @@ export function SettingsView({
         <div>
           <h2 className="text-xl font-semibold text-primary">SMS</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Compte Twilio de {organizationName}, partagé par toutes ses succursales.
+            Compte Infobip de {organizationName}, partagé par toutes ses succursales.
           </p>
         </div>
-        {sms.tokenCorrupt ? (
+        {sms.keyCorrupt ? (
           <p className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-            L&apos;Auth Token enregistré ne peut plus être déchiffré. Collez-le
-            à nouveau et enregistrez.
+            La clé API enregistrée ne peut plus être déchiffrée. Collez-la à
+            nouveau et enregistrez.
           </p>
         ) : null}
         {canManage ? (
-          <TwilioSmsSettingsForm
+          <InfobipSmsSettingsForm
             tenantId={tenantId}
             organizationId={organizationId}
             orgSlug={orgSlug}

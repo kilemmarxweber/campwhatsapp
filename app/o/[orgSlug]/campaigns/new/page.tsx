@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getOrganizationBySlug } from "@/lib/auth/organization-permission";
 import { CampaignForm } from "@/components/campaign-form";
-import { isTwilioSmsConfigured } from "@/lib/sms/config";
+import { isSmsConfigured } from "@/lib/sms/config";
 
 export default async function NewCampaignPage({
   params,
@@ -13,7 +13,7 @@ export default async function NewCampaignPage({
   const org = await getOrganizationBySlug(orgSlug);
   if (!org) notFound();
   const smsConfigured = org.tenant
-    ? await isTwilioSmsConfigured(org.tenant.id)
+    ? await isSmsConfigured(org.tenant.id)
     : false;
 
   const [contacts, media, lists, templates] = await Promise.all([

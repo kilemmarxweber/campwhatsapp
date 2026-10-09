@@ -43,7 +43,11 @@ export async function proxy(request: NextRequest) {
     : false;
 
   if (mustChangePassword && pathname !== SIGN_IN) {
-    return NextResponse.redirect(new URL(SIGN_IN, request.url));
+    const url = new URL(SIGN_IN, request.url);
+    if (isProtected(pathname)) {
+      url.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
+    }
+    return NextResponse.redirect(url);
   }
 
   if (

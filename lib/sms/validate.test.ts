@@ -1,27 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  assertTwilioAccountSid,
-  assertTwilioAuthToken,
-  assertTwilioFromNumber,
+  assertInfobipApiKey,
+  assertInfobipBaseUrl,
+  assertInfobipSender,
 } from "./validate";
 
-test("un Account SID Twilio est accepté", () => {
+test("l'URL de base Infobip est normalisée", () => {
   assert.equal(
-    assertTwilioAccountSid("AC" + "a".repeat(32)),
-    "AC" + "a".repeat(32),
+    assertInfobipBaseUrl("https://l2gerd.api.infobip.com/"),
+    "https://l2gerd.api.infobip.com",
   );
 });
 
-test("un Account SID trop court est refusé", () => {
-  assert.throws(() => assertTwilioAccountSid("AC123"), /Account SID/);
+test("une URL hors Infobip est refusée", () => {
+  assert.throws(
+    () => assertInfobipBaseUrl("https://api.twilio.com"),
+    /api\.infobip\.com/,
+  );
 });
 
-test("un Auth Token avec espace est refusé", () => {
-  assert.throws(() => assertTwilioAuthToken("token avec espace"), /Auth Token/);
+test("une clé API avec espace est refusée", () => {
+  assert.throws(() => assertInfobipApiKey("clé avec espace"), /Clé API/);
 });
 
-test("le numéro expéditeur doit être international", () => {
-  assert.equal(assertTwilioFromNumber("+243812345678"), "+243812345678");
-  assert.throws(() => assertTwilioFromNumber("0812345678"), /international/);
+test("l'expéditeur alphanumérique est accepté", () => {
+  assert.equal(assertInfobipSender("ServiceSMS"), "ServiceSMS");
+  assert.equal(assertInfobipSender("+243812345678"), "243812345678");
 });

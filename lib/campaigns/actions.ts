@@ -9,7 +9,7 @@ import { enqueueCampaign } from "@/lib/campaigns/process";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { writeOrgUpload, resolveUploadAbsolutePath } from "@/lib/upload-file.server";
 import { getKlamboClientForBranch } from "@/lib/klambo/org";
-import { isTwilioSmsConfiguredForBranch } from "@/lib/sms/config";
+import { isSmsConfiguredForBranch } from "@/lib/sms/config";
 import fs from "fs/promises";
 
 async function resolveCampaignContent(input: {
@@ -158,10 +158,10 @@ export async function createCampaign(input: {
     });
     if (
       content.channel === "sms" &&
-      !(await isTwilioSmsConfiguredForBranch(input.organizationId))
+      !(await isSmsConfiguredForBranch(input.organizationId))
     ) {
       throw new Error(
-        "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio. La campagne reste en brouillon.",
+        "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip. La campagne reste en brouillon.",
       );
     }
     await prisma.campaign.update({
@@ -193,10 +193,10 @@ export async function startCampaign(input: {
   if (!campaign) throw new Error("Campagne introuvable");
   if (
     campaign.channel === "sms" &&
-    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+    !(await isSmsConfiguredForBranch(campaign.organizationId))
   ) {
     throw new Error(
-      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip.",
     );
   }
   if (campaign.status === "sending") {
@@ -246,10 +246,10 @@ export async function retryFailedRecipients(input: {
   if (!campaign) throw new Error("Campagne introuvable");
   if (
     campaign.channel === "sms" &&
-    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+    !(await isSmsConfiguredForBranch(campaign.organizationId))
   ) {
     throw new Error(
-      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip.",
     );
   }
 
@@ -288,10 +288,10 @@ export async function resendCampaign(input: {
   if (!campaign) throw new Error("Campagne introuvable");
   if (
     campaign.channel === "sms" &&
-    !(await isTwilioSmsConfiguredForBranch(campaign.organizationId))
+    !(await isSmsConfiguredForBranch(campaign.organizationId))
   ) {
     throw new Error(
-      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez son compte Twilio.",
+      "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip.",
     );
   }
   if (campaign.status === "sending") {

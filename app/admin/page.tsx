@@ -8,7 +8,7 @@ export default async function AdminHomePage() {
       prisma.user.count(),
       prisma.tenantOrganization.count(),
       prisma.klamboConfig.count(),
-      prisma.twilioSmsConfig.count(),
+      prisma.infobipSmsConfig.count(),
     ]);
   const klamboOk = tenantCount > 0 && klamboCount === tenantCount;
   const smsOk = tenantCount > 0 && smsCount === tenantCount;

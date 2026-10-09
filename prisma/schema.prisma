@@ -116,7 +116,7 @@ model TenantOrganization {
   branches   Organization[]
   members    TenantMember[]
   klambo     KlamboConfig?
-  twilioSms  TwilioSmsConfig?
+  infobipSms InfobipSmsConfig?
 
   @@map("tenant_organization")
 }
@@ -211,19 +211,19 @@ model KlamboConfig {
   @@map("klambo_config")
 }
 
-// ─── Twilio SMS (un abonnement par organisation) ───────────
+// ─── Infobip SMS (une clé par organisation) ────────────────
 
-model TwilioSmsConfig {
-  id           String             @id @default(cuid())
-  tenantId     String             @unique
-  accountSid   String
-  authTokenEnc String
-  fromNumber   String
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  tenant       TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+model InfobipSmsConfig {
+  id        String             @id @default(cuid())
+  tenantId  String             @unique
+  apiKeyEnc String
+  baseUrl   String
+  sender    String
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  tenant    TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("twilio_sms_config")
+  @@map("infobip_sms_config")
 }
 
 // ─── Contacts ──────────────────────────────────────────────

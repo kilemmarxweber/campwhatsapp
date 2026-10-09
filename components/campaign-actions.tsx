@@ -42,7 +42,7 @@ export function CampaignActions({
     <div className="flex flex-wrap gap-2">
       {smsPendingProvider ? (
         <p className="self-center text-sm text-[var(--fg-muted)]">
-          Envoi SMS en attente du compte Twilio de cette organisation.
+          Envoi SMS en attente du compte Infobip de cette organisation.
         </p>
       ) : null}
       {!smsPendingProvider && (status === "draft" || status === "failed") && (

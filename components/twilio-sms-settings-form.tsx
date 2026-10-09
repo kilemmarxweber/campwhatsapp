@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { saveTwilioSmsSettings } from "@/lib/sms/actions";
+import { saveSmsSettings } from "@/lib/sms/actions";
+import {
+  DEFAULT_INFOBIP_BASE_URL,
+  DEFAULT_INFOBIP_SENDER,
+} from "@/lib/sms/validate";
 
-export function TwilioSmsSettingsForm({
+export function InfobipSmsSettingsForm({
   tenantId,
   organizationId,
   orgSlug,
@@ -18,27 +22,27 @@ export function TwilioSmsSettingsForm({
   orgSlug: string;
   organizationName: string;
   initial: {
-    accountSid: string;
-    authToken: string;
-    authTokenMasked: string | null;
-    fromNumber: string;
+    apiKey: string;
+    apiKeyMasked: string | null;
+    baseUrl: string;
+    sender: string;
     configured: boolean;
   };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [accountSid, setAccountSid] = useState(initial.accountSid);
-  const [authToken, setAuthToken] = useState(initial.authToken);
-  const [fromNumber, setFromNumber] = useState(initial.fromNumber);
-  const [showToken, setShowToken] = useState(false);
+  const [apiKey, setApiKey] = useState(initial.apiKey);
+  const [baseUrl, setBaseUrl] = useState(initial.baseUrl || DEFAULT_INFOBIP_BASE_URL);
+  const [sender, setSender] = useState(initial.sender || DEFAULT_INFOBIP_SENDER);
+  const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
-    setAccountSid(initial.accountSid);
-    setAuthToken(initial.authToken);
-    setFromNumber(initial.fromNumber);
-  }, [initial.accountSid, initial.authToken, initial.fromNumber]);
+    setApiKey(initial.apiKey);
+    setBaseUrl(initial.baseUrl || DEFAULT_INFOBIP_BASE_URL);
+    setSender(initial.sender || DEFAULT_INFOBIP_SENDER);
+  }, [initial.apiKey, initial.baseUrl, initial.sender]);
 
-  const configured = initial.configured && Boolean(initial.authToken);
+  const configured = initial.configured && Boolean(initial.apiKey);
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -49,8 +53,8 @@ export function TwilioSmsSettingsForm({
           </p>
           <p className="mt-1 font-mono text-sm text-[var(--fg-muted)]">
             {configured
-              ? `Token ${initial.authTokenMasked}`
-              : "Aucun compte Twilio enregistré"}
+              ? `Clé ${initial.apiKeyMasked}`
+              : "Aucun compte Infobip enregistré"}
           </p>
         </div>
         <span className={configured ? "badge badge-ok" : "badge badge-warn"}>
@@ -64,13 +68,13 @@ export function TwilioSmsSettingsForm({
           e.preventDefault();
           startTransition(async () => {
             try {
-              const result = await saveTwilioSmsSettings({
+              const result = await saveSmsSettings({
                 tenantId,
                 organizationId,
                 orgSlug,
-                accountSid,
-                authToken,
-                fromNumber,
+                apiKey,
+                baseUrl,
+                sender,
               });
               if (!result.ok) {
                 toast.error(result.message);
@@ -86,88 +90,80 @@ export function TwilioSmsSettingsForm({
       >
         <div>
           <h2 className="text-lg font-medium text-[var(--tvs-blue-deep)]">
-            Compte Twilio
+            Compte Infobip
           </h2>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            Abonnement Twilio de {organizationName}. Ses succursales envoient
-            les SMS avec ce compte. WhatsApp continue d&apos;utiliser Klambo.
+            Clé API et URL de base de {organizationName}. Ses succursales
+            envoient les SMS avec ce compte. WhatsApp continue d&apos;utiliser
+            Klambo.
           </p>
         </div>
 
         <div className="field">
-          <label htmlFor="twilio-account-sid">Account SID</label>
+          <label htmlFor="infobip-base-url">URL de base API</label>
           <input
-            id="twilio-account-sid"
-            value={accountSid}
-            onChange={(e) => setAccountSid(e.target.value.trim())}
-            placeholder="AC…"
+            id="infobip-base-url"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value.trim())}
+            placeholder={DEFAULT_INFOBIP_BASE_URL}
             autoComplete="off"
             required
           />
+          <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
+            Indiquée dans le{" "}
+            <a
+              href="https://portal.infobip.com/onboarding-guide"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--tvs-blue)] underline underline-offset-2"
+            >
+              guide Infobip
+            </a>
+            , par exemple https://l2gerd.api.infobip.com.
+          </p>
         </div>
 
         <div className="field">
-          <label htmlFor="twilio-auth-token">Auth Token</label>
+          <label htmlFor="infobip-api-key">Clé API</label>
           <div className="relative">
             <input
-              id="twilio-auth-token"
-              type={showToken ? "text" : "password"}
-              value={authToken}
-              onChange={(e) => setAuthToken(e.target.value)}
-              placeholder="Auth Token de la console Twilio"
+              id="infobip-api-key"
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Clé API du portail Infobip"
               autoComplete="off"
               className="pr-11"
-              required
+              required={!configured}
             />
             <button
               type="button"
               className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1.5 text-[var(--fg-muted)] hover:bg-[var(--tvs-blue-soft)] hover:text-[var(--tvs-blue)]"
-              onClick={() => setShowToken((v) => !v)}
-              aria-label={showToken ? "Masquer le token" : "Afficher le token"}
+              onClick={() => setShowKey((v) => !v)}
+              aria-label={showKey ? "Masquer la clé" : "Afficher la clé"}
             >
-              {showToken ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
+              {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
           <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-            Account SID et Auth Token se trouvent dans la{" "}
-            <a
-              href="https://console.twilio.com/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--tvs-blue)] underline underline-offset-2"
-            >
-              console Twilio
-            </a>
-            . Le token est chiffré en base. Canal documenté :{" "}
-            <a
-              href="https://www.twilio.com/fr-fr/messaging/channels/sms"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--tvs-blue)] underline underline-offset-2"
-            >
-              SMS Twilio
-            </a>
-            .
+            Envoyée dans l&apos;en-tête <code className="font-mono">Authorization: App …</code>.
+            La clé est chiffrée en base. Laissez le champ tel quel pour conserver
+            la clé déjà enregistrée.
           </p>
         </div>
 
         <div className="field">
-          <label htmlFor="twilio-from">Numéro expéditeur</label>
+          <label htmlFor="infobip-sender">Expéditeur</label>
           <input
-            id="twilio-from"
-            value={fromNumber}
-            onChange={(e) => setFromNumber(e.target.value.trim())}
-            placeholder="+1…"
+            id="infobip-sender"
+            value={sender}
+            onChange={(e) => setSender(e.target.value.trim())}
+            placeholder={DEFAULT_INFOBIP_SENDER}
             autoComplete="off"
             required
           />
           <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-            Numéro Twilio au format international. C&apos;est la valeur{" "}
-            <code className="font-mono">From</code> des SMS.
+            Valeur <code className="font-mono">sender</code> des SMS, par exemple ServiceSMS.
           </p>
         </div>
 
