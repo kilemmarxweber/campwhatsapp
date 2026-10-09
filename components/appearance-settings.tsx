@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { KlamboSettingsForm } from "@/components/klambo-settings-form";
+import { WhatsappProviderSettings } from "@/components/infobip-whatsapp-settings";
+import type { WhatsappProvider } from "@/lib/whatsapp/config";
 import { InfobipSmsSettingsForm } from "@/components/twilio-sms-settings-form";
 import { updateTenantAppearance } from "@/lib/appearance/actions";
 import {
@@ -26,6 +28,7 @@ export function SettingsView({
   webhookEndpoint,
   klambo,
   sms,
+  infobipWhatsapp,
 }: {
   organizationId: string;
   orgSlug: string;
@@ -41,6 +44,15 @@ export function SettingsView({
     hasWebhookSecret: boolean;
     configured: boolean;
     corrupt: boolean;
+  };
+  infobipWhatsapp: {
+    apiKey: string;
+    apiKeyMasked: string | null;
+    baseUrl: string;
+    fromNumber: string;
+    configured: boolean;
+    keyCorrupt: boolean;
+    provider: WhatsappProvider;
   };
   sms: {
     apiKey: string;
@@ -254,23 +266,38 @@ export function SettingsView({
           <h2 className="text-xl font-semibold text-primary">{copy.settings.whatsappTitle}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{copy.settings.whatsappBody}</p>
         </div>
-        {klambo.corrupt ? (
+        {klambo.corrupt || infobipWhatsapp.keyCorrupt ? (
           <p className="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-            La clé API enregistrée ne peut plus être déchiffrée. Collez-la à
+            Une clé API enregistrée ne peut plus être déchiffrée. Collez-la à
             nouveau et enregistrez.
           </p>
         ) : null}
         {canManage ? (
-          <KlamboSettingsForm
+          <WhatsappProviderSettings
             tenantId={tenantId}
             organizationId={organizationId}
             orgSlug={orgSlug}
-            webhookEndpoint={webhookEndpoint}
-            initial={klambo}
+            organizationName={organizationName}
+            initial={infobipWhatsapp}
+            klambo={
+              <KlamboSettingsForm
+                tenantId={tenantId}
+                organizationId={organizationId}
+                orgSlug={orgSlug}
+                webhookEndpoint={webhookEndpoint}
+                initial={klambo}
+              />
+            }
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            {klambo.configured ? copy.settings.connected : copy.settings.notConfigured}
+            {infobipWhatsapp.provider === "infobip"
+              ? infobipWhatsapp.configured
+                ? "Infobip connecté"
+                : copy.settings.notConfigured
+              : klambo.configured
+                ? copy.settings.connected
+                : copy.settings.notConfigured}
           </p>
         )}
       </section>

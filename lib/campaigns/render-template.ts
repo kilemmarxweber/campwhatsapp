@@ -21,6 +21,18 @@ export function renderTemplate(template: string, vars: TemplateVars): string {
   });
 }
 
+/** Valeurs des {{variables}}, dans l'ordre d'apparition, pour Infobip. */
+export function templatePlaceholderValues(
+  template: string,
+  vars: TemplateVars,
+): string[] {
+  const normalized = normalizeVars(vars);
+  return [...template.matchAll(placeholderRegex())].map((match) => {
+    const key = match[1]?.toLowerCase() ?? "";
+    return normalized[key] ?? "";
+  });
+}
+
 export function extractTemplateKeys(template: string): string[] {
   const keys = new Set<string>();
   for (const match of template.matchAll(placeholderRegex())) {

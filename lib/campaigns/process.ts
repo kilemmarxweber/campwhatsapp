@@ -3,6 +3,8 @@ import { getKlamboClientForBranch } from "@/lib/klambo/org";
 import { renderTemplate } from "@/lib/campaigns/render-template";
 import { readUploadBuffer } from "@/lib/upload-file.server";
 import { processSmsCampaign } from "@/lib/sms/process";
+import { getWhatsappProvider } from "@/lib/whatsapp/config";
+import { processInfobipWhatsappCampaign } from "@/lib/whatsapp/infobip-process";
 
 function contactVars(contact: {
   name: string | null;
@@ -53,6 +55,18 @@ export async function processCampaign(campaignId: string) {
   if (campaign.status === "cancelled") return;
   if (campaign.channel === "sms") {
     await processSmsCampaign(campaignId);
+    return;
+  }
+
+  const branch = await prisma.organization.findUnique({
+    where: { id: campaign.organizationId },
+    select: { tenantId: true },
+  });
+  if (
+    branch?.tenantId &&
+    (await getWhatsappProvider(branch.tenantId)) === "infobip"
+  ) {
+    await processInfobipWhatsappCampaign(campaignId);
     return;
   }
 

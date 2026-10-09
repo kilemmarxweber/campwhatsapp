@@ -31,7 +31,7 @@ export function assertInfobipBaseUrl(value: string) {
 }
 
 export function assertInfobipApiKey(value: string) {
-  const key = value.trim();
+  const key = value.trim().replace(/^app\s+/i, "");
   if (key.length < 8 || /\s/.test(key)) {
     throw new Error("Clé API Infobip invalide.");
   }

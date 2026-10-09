@@ -41,16 +41,32 @@ async function readInfobipError(res: Response) {
   return `Infobip a répondu ${res.status}`;
 }
 
+/**
+ * Une clé d'envoi n'a souvent pas le droit de lire le solde du compte.
+ * On interroge l'API d'envoi avec un corps vide : 400 = clé acceptée, 401 = refus.
+ */
 export async function verifyInfobipAccount(input: {
   apiKey: string;
   baseUrl: string;
+  scope?: "sms" | "whatsapp";
 }) {
-  const res = await fetch(`${input.baseUrl}/account/1/balance`, {
-    headers: infobipHeaders(input.apiKey),
+  const path =
+    input.scope === "whatsapp"
+      ? "/whatsapp/1/message/template"
+      : "/sms/3/messages";
+  const res = await fetch(`${input.baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      ...infobipHeaders(input.apiKey),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messages: [] }),
   });
-  if (!res.ok) {
-    throw new InfobipSmsError(await readInfobipError(res), res.status);
+  if (res.ok || res.status === 400) {
+    await res.text().catch(() => "");
+    return;
   }
+  throw new InfobipSmsError(await readInfobipError(res), res.status);
 }
 
 type InfobipSendResponse = {

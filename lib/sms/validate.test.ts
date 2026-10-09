@@ -24,6 +24,10 @@ test("une clé API avec espace est refusée", () => {
   assert.throws(() => assertInfobipApiKey("clé avec espace"), /Clé API/);
 });
 
+test("le préfixe App de l'en-tête est retiré", () => {
+  assert.equal(assertInfobipApiKey("App abcdefghijklmnop"), "abcdefghijklmnop");
+});
+
 test("l'expéditeur alphanumérique est accepté", () => {
   assert.equal(assertInfobipSender("ServiceSMS"), "ServiceSMS");
   assert.equal(assertInfobipSender("+243812345678"), "243812345678");

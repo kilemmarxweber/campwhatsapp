@@ -111,12 +111,14 @@ model TenantOrganization {
   colorRed   String          @default("#dc4226")
   colorWhite String          @default("#ffffff")
   colorBlue  String          @default("#253c80")
-  locale     String          @default("fr")
-  createdAt  DateTime        @default(now())
-  branches   Organization[]
-  members    TenantMember[]
-  klambo     KlamboConfig?
-  infobipSms InfobipSmsConfig?
+  locale            String               @default("fr")
+  whatsappProvider  String               @default("klambo")
+  createdAt         DateTime             @default(now())
+  branches          Organization[]
+  members           TenantMember[]
+  klambo            KlamboConfig?
+  infobipSms        InfobipSmsConfig?
+  infobipWhatsapp   InfobipWhatsappConfig?
 
   @@map("tenant_organization")
 }
@@ -226,6 +228,20 @@ model InfobipSmsConfig {
   @@map("infobip_sms_config")
 }
 
+/// WhatsApp Infobip, distinct de Klambo et du SMS Infobip.
+model InfobipWhatsappConfig {
+  id         String             @id @default(cuid())
+  tenantId   String             @unique
+  apiKeyEnc  String
+  baseUrl    String
+  fromNumber String
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  tenant     TenantOrganization @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("infobip_whatsapp_config")
+}
+
 // ─── Contacts ──────────────────────────────────────────────
 
 model Contact {
@@ -331,9 +347,11 @@ model MessageTemplate {
   mediaId        String?
   link1Label     String?
   link1Url       String?
-  link2Label     String?
-  link2Url       String?
-  createdAt      DateTime            @default(now())
+  link2Label           String?
+  link2Url             String?
+  infobipTemplateName  String?
+  infobipLanguage      String          @default("en")
+  createdAt            DateTime        @default(now())
   updatedAt      DateTime            @updatedAt
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   media          MediaAsset?         @relation(fields: [mediaId], references: [id], onDelete: SetNull)
@@ -381,8 +399,10 @@ model Campaign {
   status         CampaignStatus      @default(draft)
   messageType    CampaignMessageType @default(text)
   channel        CampaignChannel     @default(whatsapp)
-  bodyTemplate   String
-  mediaId        String?
+  bodyTemplate         String
+  whatsappTemplateName String?
+  whatsappLanguage     String?
+  mediaId              String?
   contactListId  String?
   scheduledAt    DateTime?
   startedAt      DateTime?

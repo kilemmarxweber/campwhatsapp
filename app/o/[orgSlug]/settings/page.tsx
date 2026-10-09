@@ -9,6 +9,12 @@ import { decryptSecret, maskApiKey } from "@/lib/crypto";
 import { getKlamboConfig } from "@/lib/klambo/org";
 import { isSmsConfigured, loadSmsFormState } from "@/lib/sms/config";
 import {
+  getWhatsappProvider,
+  isInfobipWhatsappConfigured,
+  loadInfobipWhatsappFormState,
+} from "@/lib/whatsapp/config";
+import { DEFAULT_INFOBIP_WHATSAPP_BASE_URL } from "@/lib/whatsapp/validate";
+import {
   DEFAULT_INFOBIP_BASE_URL,
   DEFAULT_INFOBIP_SENDER,
 } from "@/lib/sms/validate";
@@ -48,6 +54,18 @@ export default async function OrgSettingsPage({
     apiKeyMasked = "••••••••";
   }
 
+  const infobipWhatsapp = canManage
+    ? await loadInfobipWhatsappFormState(org.tenant.id)
+    : {
+        apiKey: "",
+        apiKeyMasked: null,
+        baseUrl: DEFAULT_INFOBIP_WHATSAPP_BASE_URL,
+        fromNumber: "",
+        configured: await isInfobipWhatsappConfigured(org.tenant.id),
+        keyCorrupt: false,
+        provider: await getWhatsappProvider(org.tenant.id),
+      };
+
   const sms = canManage
     ? await loadSmsFormState(org.tenant.id)
     : {
@@ -72,6 +90,7 @@ export default async function OrgSettingsPage({
       organizationName={org.tenant.name}
       canManage={canManage}
       webhookEndpoint={`${appUrl.replace(/\/$/, "")}/api/webhooks/klambo`}
+      infobipWhatsapp={infobipWhatsapp}
       klambo={{
         apiKey,
         apiKeyMasked,

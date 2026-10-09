@@ -71,7 +71,7 @@ export async function saveSmsSettings(input: {
   }
 
   try {
-    await verifyInfobipAccount({ apiKey, baseUrl });
+    await verifyInfobipAccount({ apiKey, baseUrl, scope: "sms" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, message: `Compte Infobip refusé : ${msg}` };

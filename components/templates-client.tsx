@@ -36,6 +36,8 @@ type TemplateRow = {
   link1Url: string | null;
   link2Label: string | null;
   link2Url: string | null;
+  infobipTemplateName: string | null;
+  infobipLanguage: string;
   media: {
     id: string;
     filename: string;
@@ -74,6 +76,8 @@ export function TemplatesClient({
   const [link1Url, setLink1Url] = useState(APP_LINKS[0].url);
   const [link2Label, setLink2Label] = useState("");
   const [link2Url, setLink2Url] = useState("");
+  const [infobipTemplateName, setInfobipTemplateName] = useState("");
+  const [infobipLanguage, setInfobipLanguage] = useState("en");
 
   const selectedMedia = useMemo(
     () => media.find((m) => m.id === mediaId) ?? null,
@@ -118,6 +122,8 @@ export function TemplatesClient({
     setLink1Url(APP_LINKS[0].url);
     setLink2Label("");
     setLink2Url("");
+    setInfobipTemplateName("");
+    setInfobipLanguage("en");
   }
 
   function loadTemplate(t: TemplateRow) {
@@ -132,6 +138,8 @@ export function TemplatesClient({
     setLink1Url(t.link1Url ?? APP_LINKS[0].url);
     setLink2Label(t.link2Label ?? "");
     setLink2Url(t.link2Url ?? "");
+    setInfobipTemplateName(t.infobipTemplateName ?? "");
+    setInfobipLanguage(t.infobipLanguage || "en");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -158,6 +166,8 @@ export function TemplatesClient({
     link1Url: link1Url.trim() || null,
     link2Label: link2Url.trim() ? link2Label : null,
     link2Url: link2Url.trim() || null,
+    infobipTemplateName: channel === "whatsapp" ? infobipTemplateName.trim() || null : null,
+    infobipLanguage: channel === "whatsapp" ? infobipLanguage : "en",
   };
 
   return (
@@ -260,6 +270,36 @@ export function TemplatesClient({
               </select>
             </div> : <div className="rounded-lg bg-[var(--tvs-blue-soft)]/40 p-3 text-sm text-[var(--fg-muted)]">SMS : texte et liens uniquement, sans média.</div>}
           </div>
+
+          {channel === "whatsapp" ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="field">
+                <label htmlFor="tpl-infobip-name">Modèle Infobip</label>
+                <input
+                  id="tpl-infobip-name"
+                  value={infobipTemplateName}
+                  onChange={(e) => setInfobipTemplateName(e.target.value.trim())}
+                  placeholder="test_whatsapp_template_en"
+                  spellCheck={false}
+                />
+                <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
+                  templateName du portail. Les {"{{variables}}"} deviennent les placeholders, dans l&apos;ordre.
+                </p>
+              </div>
+              <div className="field">
+                <label htmlFor="tpl-infobip-lang">Langue du modèle</label>
+                <select
+                  id="tpl-infobip-lang"
+                  value={infobipLanguage}
+                  onChange={(e) => setInfobipLanguage(e.target.value)}
+                >
+                  <option value="en">en</option>
+                  <option value="fr">fr</option>
+                  <option value="pt">pt</option>
+                </select>
+              </div>
+            </div>
+          ) : null}
 
           {channel === "whatsapp" && (messageType === "image" || messageType === "video") && (
             <div className="field">

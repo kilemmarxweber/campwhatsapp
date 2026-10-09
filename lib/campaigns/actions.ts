@@ -10,7 +10,25 @@ import { renderTemplate } from "@/lib/campaigns/render-template";
 import { writeOrgUpload, resolveUploadAbsolutePath } from "@/lib/upload-file.server";
 import { getKlamboClientForBranch } from "@/lib/klambo/org";
 import { isSmsConfiguredForBranch } from "@/lib/sms/config";
+import {
+  assertWhatsappLanguage,
+  assertWhatsappTemplateName,
+} from "@/lib/whatsapp/validate";
 import fs from "fs/promises";
+
+function infobipTemplateFields(input: {
+  channel: "whatsapp" | "sms";
+  infobipTemplateName?: string | null;
+  infobipLanguage?: string | null;
+}) {
+  if (input.channel !== "whatsapp") {
+    return { infobipTemplateName: null, infobipLanguage: "en" };
+  }
+  return {
+    infobipTemplateName: assertWhatsappTemplateName(input.infobipTemplateName ?? ""),
+    infobipLanguage: assertWhatsappLanguage(input.infobipLanguage || "en"),
+  };
+}
 
 async function resolveCampaignContent(input: {
   organizationId: string;
@@ -55,6 +73,10 @@ async function resolveCampaignContent(input: {
       | "video",
     channel: template.channel as "whatsapp" | "sms",
     mediaId: template.channel === "sms" ? null : template.mediaId,
+    whatsappTemplateName:
+      template.channel === "whatsapp" ? template.infobipTemplateName : null,
+    whatsappLanguage:
+      template.channel === "whatsapp" ? template.infobipLanguage : null,
   };
 }
 
@@ -135,6 +157,8 @@ export async function createCampaign(input: {
       messageType: content.messageType,
       channel: content.channel,
       mediaId: content.mediaId || null,
+      whatsappTemplateName: content.whatsappTemplateName,
+      whatsappLanguage: content.whatsappLanguage,
       contactListId: input.contactListId || null,
       status: "draft",
       recipients: {
@@ -389,6 +413,8 @@ export async function updateCampaign(input: {
         messageType: content.messageType,
         channel: content.channel,
         mediaId: content.mediaId || null,
+        whatsappTemplateName: content.whatsappTemplateName,
+        whatsappLanguage: content.whatsappLanguage,
         contactListId: input.contactListId || null,
         status: "draft",
         startedAt: null,
@@ -582,6 +608,8 @@ export async function createTemplate(input: {
   link1Url?: string | null;
   link2Label?: string | null;
   link2Url?: string | null;
+  infobipTemplateName?: string | null;
+  infobipLanguage?: string | null;
 }) {
   await requireOrganizationPermission(input.organizationId, {
     templates: ["create"],
@@ -633,6 +661,11 @@ export async function createTemplate(input: {
       link1Url,
       link2Label: link2Url ? input.link2Label?.trim() || "Lien" : null,
       link2Url,
+      ...infobipTemplateFields({
+        channel,
+        infobipTemplateName: input.infobipTemplateName,
+        infobipLanguage: input.infobipLanguage,
+      }),
     },
   });
   revalidatePath(`/o/${input.orgSlug}/templates`);
@@ -653,6 +686,8 @@ export async function updateTemplate(input: {
   link1Url?: string | null;
   link2Label?: string | null;
   link2Url?: string | null;
+  infobipTemplateName?: string | null;
+  infobipLanguage?: string | null;
 }) {
   await requireOrganizationPermission(input.organizationId, {
     templates: ["update"],
@@ -719,6 +754,11 @@ export async function updateTemplate(input: {
       link1Url,
       link2Label: link2Url ? input.link2Label?.trim() || "Lien" : null,
       link2Url,
+      ...infobipTemplateFields({
+        channel,
+        infobipTemplateName: input.infobipTemplateName,
+        infobipLanguage: input.infobipLanguage,
+      }),
     },
   });
   revalidatePath(`/o/${input.orgSlug}/templates`);

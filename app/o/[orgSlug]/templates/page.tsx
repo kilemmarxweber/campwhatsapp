@@ -27,6 +27,8 @@ export default async function TemplatesPage({
         link1Url: true,
         link2Label: true,
         link2Url: true,
+        infobipTemplateName: true,
+        infobipLanguage: true,
         media: { select: { id: true, filename: true, kind: true, storagePath: true } },
       },
     }),
