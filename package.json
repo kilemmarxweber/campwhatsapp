@@ -12,7 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test lib/auth/tenant-access.test.ts lib/auth/governance-rules.test.ts lib/campaigns/channel-rules.test.ts lib/sms/validate.test.ts"
+    "test": "node --import tsx --test lib/auth/tenant-access.test.ts lib/auth/governance-rules.test.ts lib/campaigns/channel-rules.test.ts lib/campaigns/render-template.test.ts lib/sms/validate.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

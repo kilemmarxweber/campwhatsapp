@@ -12,7 +12,12 @@ import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-
 import {
   BASE_CONTACT_VARS,
   extractTemplateKeys,
+  toInfobipPlaceholders,
 } from "@/lib/campaigns/render-template";
+import {
+  refreshInfobipWhatsappTemplate,
+  submitInfobipWhatsappTemplate,
+} from "@/lib/whatsapp/actions";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 import { MediaThumb } from "@/components/media-thumb";
 import {
@@ -38,6 +43,8 @@ type TemplateRow = {
   link2Url: string | null;
   infobipTemplateName: string | null;
   infobipLanguage: string;
+  infobipTemplateId: string | null;
+  infobipTemplateStatus: string | null;
   media: {
     id: string;
     filename: string;
@@ -48,18 +55,33 @@ type TemplateRow = {
 
 const DEFAULT_BODY = "Bonjour {{name}},\n\nDécouvrez nos offres.";
 
+function infobipStatusLabel(status: string | null | undefined) {
+  switch ((status ?? "").toUpperCase()) {
+    case "APPROVED":
+      return "approuvé";
+    case "PENDING":
+      return "en attente";
+    case "REJECTED":
+      return "refusé";
+    default:
+      return status ? status.toLowerCase() : "";
+  }
+}
+
 export function TemplatesClient({
   organizationId,
   orgSlug,
   brandName,
   templates,
   media,
+  whatsappProvider = "klambo",
 }: {
   organizationId: string;
   orgSlug: string;
   brandName: string;
   templates: TemplateRow[];
   media: Media[];
+  whatsappProvider?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -77,7 +99,9 @@ export function TemplatesClient({
   const [link2Label, setLink2Label] = useState("");
   const [link2Url, setLink2Url] = useState("");
   const [infobipTemplateName, setInfobipTemplateName] = useState("");
-  const [infobipLanguage, setInfobipLanguage] = useState("en");
+  const [infobipLanguage, setInfobipLanguage] = useState("fr");
+  const [infobipStatus, setInfobipStatus] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedMedia = useMemo(
     () => media.find((m) => m.id === mediaId) ?? null,
@@ -100,6 +124,8 @@ export function TemplatesClient({
     () => extractTemplateKeys(captionPreview),
     [captionPreview],
   );
+  const infobipBody = useMemo(() => toInfobipPlaceholders(body), [body]);
+  const usesInfobip = channel === "whatsapp" && whatsappProvider === "infobip";
 
   function insertVariable(key: string) {
     const token = `{{${key}}}`;
@@ -123,7 +149,9 @@ export function TemplatesClient({
     setLink2Label("");
     setLink2Url("");
     setInfobipTemplateName("");
-    setInfobipLanguage("en");
+    setInfobipLanguage("fr");
+    setInfobipStatus(null);
+    setSubmitError(null);
   }
 
   function loadTemplate(t: TemplateRow) {
@@ -139,7 +167,9 @@ export function TemplatesClient({
     setLink2Label(t.link2Label ?? "");
     setLink2Url(t.link2Url ?? "");
     setInfobipTemplateName(t.infobipTemplateName ?? "");
-    setInfobipLanguage(t.infobipLanguage || "en");
+    setInfobipLanguage(t.infobipLanguage || "fr");
+    setInfobipStatus(t.infobipTemplateStatus);
+    setSubmitError(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -271,33 +301,126 @@ export function TemplatesClient({
             </div> : <div className="rounded-lg bg-[var(--tvs-blue-soft)]/40 p-3 text-sm text-[var(--fg-muted)]">SMS : texte et liens uniquement, sans média.</div>}
           </div>
 
-          {channel === "whatsapp" ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="field">
-                <label htmlFor="tpl-infobip-name">Modèle Infobip</label>
-                <input
-                  id="tpl-infobip-name"
-                  value={infobipTemplateName}
-                  onChange={(e) => setInfobipTemplateName(e.target.value.trim())}
-                  placeholder="test_whatsapp_template_en"
-                  spellCheck={false}
-                />
-                <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-                  templateName du portail. Les {"{{variables}}"} deviennent les placeholders, dans l&apos;ordre.
+          {usesInfobip ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-[var(--border)] p-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="field">
+                  <label htmlFor="tpl-infobip-name">Nom du modèle WhatsApp</label>
+                  <input
+                    id="tpl-infobip-name"
+                    value={infobipTemplateName}
+                    onChange={(e) => setInfobipTemplateName(e.target.value.trim())}
+                    placeholder="offre_tvs"
+                    spellCheck={false}
+                  />
+                  <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
+                    Minuscules et _. Laisser vide reprend le nom du template.
+                  </p>
+                </div>
+                <div className="field">
+                  <label htmlFor="tpl-infobip-lang">Langue du modèle</label>
+                  <select
+                    id="tpl-infobip-lang"
+                    value={infobipLanguage}
+                    onChange={(e) => setInfobipLanguage(e.target.value)}
+                  >
+                    <option value="fr">fr</option>
+                    <option value="en">en</option>
+                    <option value="pt">pt</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-sm text-[var(--fg-muted)]">
+                {"{{name}}"} et {"{{phone}}"} viennent de la fiche contact. À
+                l&apos;envoi, chaque destinataire reçoit son nom et son numéro.
+                Pour l&apos;approbation, elles deviennent {"{{1}}"} puis {"{{2}}"}.
+              </p>
+              <p className="rounded-md bg-[var(--tvs-blue-soft)]/40 px-3 py-2 font-mono text-sm">
+                {infobipBody.text || "Le texte envoyé à WhatsApp apparaîtra ici."}
+              </p>
+              {infobipBody.keys.length > 0 ? (
+                <p className="text-xs text-[var(--fg-muted)]">
+                  {infobipBody.keys
+                    .map((key, index) => `{{${index + 1}}} = contact.${key}`)
+                    .join(" · ")}
+                  . L&apos;exemple d&apos;approbation est pris sur le premier contact.
                 </p>
-              </div>
-              <div className="field">
-                <label htmlFor="tpl-infobip-lang">Langue du modèle</label>
-                <select
-                  id="tpl-infobip-lang"
-                  value={infobipLanguage}
-                  onChange={(e) => setInfobipLanguage(e.target.value)}
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {infobipStatus ? (
+                  <span className="badge" style={{ textTransform: "none" }}>
+                    WhatsApp : {infobipStatusLabel(infobipStatus)}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={pending || !editingId}
+                  onClick={() => {
+                    if (!editingId) return;
+                    startTransition(async () => {
+                      setSubmitError(null);
+                      const result = await submitInfobipWhatsappTemplate({
+                        organizationId,
+                        orgSlug,
+                        templateId: editingId,
+                        body: payload.body,
+                        infobipTemplateName: payload.infobipTemplateName,
+                        infobipLanguage: payload.infobipLanguage,
+                      });
+                      if (!result.ok) {
+                        setSubmitError(result.message);
+                        toast.error(result.message);
+                        return;
+                      }
+                      setInfobipTemplateName(result.name);
+                      setInfobipStatus(result.status);
+                      toast.success(
+                        `Modèle soumis (${infobipStatusLabel(result.status)})`,
+                      );
+                      router.refresh();
+                    });
+                  }}
                 >
-                  <option value="en">en</option>
-                  <option value="fr">fr</option>
-                  <option value="pt">pt</option>
-                </select>
+                  {pending ? "Envoi…" : "Soumettre pour approbation"}
+                </button>
+                {infobipStatus ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={pending || !editingId}
+                    onClick={() => {
+                      if (!editingId) return;
+                      startTransition(async () => {
+                        const result = await refreshInfobipWhatsappTemplate({
+                          organizationId,
+                          orgSlug,
+                          templateId: editingId,
+                        });
+                        if (!result.ok) {
+                          toast.error(result.message);
+                          return;
+                        }
+                        setInfobipStatus(result.status);
+                        toast.success(
+                          `Statut : ${infobipStatusLabel(result.status)}`,
+                        );
+                        router.refresh();
+                      });
+                    }}
+                  >
+                    Actualiser le statut
+                  </button>
+                ) : null}
               </div>
+              {!editingId ? (
+                <p className="text-xs text-[var(--fg-muted)]">
+                  Enregistrez le template, puis soumettez-le à WhatsApp.
+                </p>
+              ) : null}
+              {submitError ? (
+                <p className="text-sm text-[var(--tvs-red)]">{submitError}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -467,6 +590,11 @@ export function TemplatesClient({
                   <p className="font-medium">{t.name}</p>
                   <span className="badge">{t.messageType}</span>
                   <span className="badge">{t.channel.toUpperCase()}</span>
+                  {t.channel === "whatsapp" && t.infobipTemplateStatus ? (
+                    <span className="badge" style={{ textTransform: "none" }}>
+                      {infobipStatusLabel(t.infobipTemplateStatus)}
+                    </span>
+                  ) : null}
                   {t.media && (
                     <span className="text-sm text-[var(--fg-muted)]">
                       {t.media.filename}

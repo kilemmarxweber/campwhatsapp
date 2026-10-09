@@ -1,5 +1,8 @@
 import prisma from "@/lib/prisma";
-import { templatePlaceholderValues } from "@/lib/campaigns/render-template";
+import {
+  toInfobipPlaceholders,
+  valuesForPlaceholderKeys,
+} from "@/lib/campaigns/render-template";
 import { InfobipSmsError } from "@/lib/sms/client";
 import { getInfobipWhatsappCredentials } from "@/lib/whatsapp/config";
 import { sendInfobipWhatsappTemplate } from "@/lib/whatsapp/infobip-client";
@@ -87,7 +90,10 @@ export async function processInfobipWhatsappCampaign(campaignId: string) {
     if (live?.status === "cancelled") break;
 
     const vars = contactVars(recipient.contact);
-    const placeholders = templatePlaceholderValues(campaign.bodyTemplate, vars);
+    const placeholders = valuesForPlaceholderKeys(
+      toInfobipPlaceholders(campaign.bodyTemplate).keys,
+      vars,
+    );
     await prisma.campaignRecipient.update({
       where: { id: recipient.id },
       data: { renderedBody: campaign.bodyTemplate, status: "queued" },

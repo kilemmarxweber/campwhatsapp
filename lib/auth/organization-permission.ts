@@ -170,6 +170,7 @@ export async function getOrganizationBySlug(slug: string) {
           colorWhite: true,
           colorBlue: true,
           locale: true,
+          whatsappProvider: true,
         },
       },
     },

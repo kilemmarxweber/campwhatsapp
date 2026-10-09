@@ -742,6 +742,16 @@ export async function updateTemplate(input: {
     throw new Error("Le lien 2 doit commencer par http:// ou https://");
   }
 
+  const infobip = infobipTemplateFields({
+    channel,
+    infobipTemplateName: input.infobipTemplateName,
+    infobipLanguage: input.infobipLanguage,
+  });
+  const approvalStale =
+    existing.body !== input.body ||
+    (existing.infobipTemplateName ?? null) !== infobip.infobipTemplateName ||
+    existing.infobipLanguage !== infobip.infobipLanguage;
+
   const tpl = await prisma.messageTemplate.update({
     where: { id: existing.id },
     data: {
@@ -754,11 +764,10 @@ export async function updateTemplate(input: {
       link1Url,
       link2Label: link2Url ? input.link2Label?.trim() || "Lien" : null,
       link2Url,
-      ...infobipTemplateFields({
-        channel,
-        infobipTemplateName: input.infobipTemplateName,
-        infobipLanguage: input.infobipLanguage,
-      }),
+      ...infobip,
+      ...(approvalStale
+        ? { infobipTemplateId: null, infobipTemplateStatus: null }
+        : {}),
     },
   });
   revalidatePath(`/o/${input.orgSlug}/templates`);

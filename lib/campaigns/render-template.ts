@@ -21,16 +21,33 @@ export function renderTemplate(template: string, vars: TemplateVars): string {
   });
 }
 
-/** Valeurs des {{variables}}, dans l'ordre d'apparition, pour Infobip. */
-export function templatePlaceholderValues(
-  template: string,
-  vars: TemplateVars,
-): string[] {
-  const normalized = normalizeVars(vars);
-  return [...template.matchAll(placeholderRegex())].map((match) => {
-    const key = match[1]?.toLowerCase() ?? "";
-    return normalized[key] ?? "";
+/**
+ * {{name}} puis {{phone}} deviennent {{1}} puis {{2}}.
+ * Un même nom répété garde le même numéro.
+ */
+export function toInfobipPlaceholders(template: string): {
+  text: string;
+  keys: string[];
+} {
+  const keys: string[] = [];
+  const seen = new Map<string, number>();
+  const numbered = template.replace(placeholderRegex(), (_, raw: string) => {
+    const key = String(raw).toLowerCase();
+    let index = seen.get(key);
+    if (!index) {
+      keys.push(key);
+      index = keys.length;
+      seen.set(key, index);
+    }
+    return `{{${index}}}`;
   });
+  const text = numbered.replace(/\s+/g, " ").trim();
+  return { text, keys };
+}
+
+export function valuesForPlaceholderKeys(keys: string[], vars: TemplateVars): string[] {
+  const normalized = normalizeVars(vars);
+  return keys.map((key) => normalized[key.toLowerCase()] ?? "");
 }
 
 export function extractTemplateKeys(template: string): string[] {

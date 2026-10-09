@@ -29,6 +29,8 @@ export default async function TemplatesPage({
         link2Url: true,
         infobipTemplateName: true,
         infobipLanguage: true,
+        infobipTemplateId: true,
+        infobipTemplateStatus: true,
         media: { select: { id: true, filename: true, kind: true, storagePath: true } },
       },
     }),
@@ -54,6 +56,7 @@ export default async function TemplatesPage({
         brandName={org.name}
         templates={templates}
         media={media}
+        whatsappProvider={org.tenant?.whatsappProvider ?? "klambo"}
       />
     </div>
   );

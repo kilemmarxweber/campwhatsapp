@@ -87,3 +87,77 @@ export async function sendInfobipWhatsappTemplate(input: {
   }
   return { messageId: message?.messageId || messageId };
 }
+
+export type InfobipTemplateRecord = {
+  id?: string;
+  name?: string;
+  language?: string;
+  status?: string;
+};
+
+function asTemplateRecord(data: unknown): InfobipTemplateRecord {
+  if (!data || typeof data !== "object") return {};
+  const row = data as Record<string, unknown>;
+  const status = row.status;
+  const statusText =
+    typeof status === "string"
+      ? status
+      : status && typeof status === "object" && "name" in status
+        ? String((status as { name?: unknown }).name ?? "")
+        : "";
+  return {
+    id: row.id == null ? undefined : String(row.id),
+    name: typeof row.name === "string" ? row.name : undefined,
+    language: typeof row.language === "string" ? row.language : undefined,
+    status: statusText || undefined,
+  };
+}
+
+export async function createInfobipWhatsappTemplate(input: {
+  apiKey: string;
+  baseUrl: string;
+  sender: string;
+  name: string;
+  language: string;
+  bodyText: string;
+  examples: string[];
+}) {
+  const res = await fetch(
+    `${input.baseUrl.replace(/\/$/, "")}/whatsapp/2/senders/${encodeURIComponent(input.sender)}/templates`,
+    {
+      method: "POST",
+      headers: headers(input.apiKey),
+      body: JSON.stringify({
+        name: input.name,
+        language: input.language,
+        category: "MARKETING",
+        structure: {
+          body: input.examples.length
+            ? { text: input.bodyText, examples: input.examples }
+            : { text: input.bodyText },
+          type: "TEXT",
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new InfobipSmsError(await readError(res), res.status);
+  }
+  return asTemplateRecord(await res.json());
+}
+
+export async function getInfobipWhatsappTemplate(input: {
+  apiKey: string;
+  baseUrl: string;
+  sender: string;
+  templateId: string;
+}) {
+  const res = await fetch(
+    `${input.baseUrl.replace(/\/$/, "")}/whatsapp/2/senders/${encodeURIComponent(input.sender)}/templates/${encodeURIComponent(input.templateId)}`,
+    { headers: headers(input.apiKey) },
+  );
+  if (!res.ok) {
+    throw new InfobipSmsError(await readError(res), res.status);
+  }
+  return asTemplateRecord(await res.json());
+}
