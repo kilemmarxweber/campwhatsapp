@@ -7,9 +7,18 @@ export function normalizePhone(
   raw: string,
   defaultCountry: CountryCode = "CD",
 ): string | null {
-  const cleaned = raw.trim();
+  let cleaned = raw.trim();
   if (!cleaned) return null;
-  const phone = parsePhoneNumberFromString(cleaned, defaultCountry);
+
+  // Excel / CSV : espaces, tirets, points entre chiffres
+  cleaned = cleaned.replace(/[\s().\-]/g, "");
+  // Apostrophe texte Excel
+  if (cleaned.startsWith("'")) cleaned = cleaned.slice(1);
+
+  let phone = parsePhoneNumberFromString(cleaned, defaultCountry);
+  if ((!phone || !phone.isValid()) && /^\d{10,15}$/.test(cleaned)) {
+    phone = parsePhoneNumberFromString(`+${cleaned}`);
+  }
   if (!phone || !phone.isValid()) return null;
   return phone.format("E.164");
 }

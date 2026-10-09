@@ -1,12 +1,14 @@
 import ExcelJS from "exceljs";
 import { readUploadBuffer } from "@/lib/upload-file.server";
+import {
+  CONTACT_BASE_COLUMNS,
+  CONTACT_DEFAULT_VARIABLE_COLUMNS,
+  isBaseColumn,
+} from "@/lib/contacts/columns";
 
 const TVS_BLUE = "FF253C80";
 const TVS_RED = "FFDC4226";
 const HEADER_FILL = TVS_BLUE;
-
-/** Colonnes variables proposées quand la base est vide (modèle d’import). */
-const DEFAULT_VARIABLE_COLUMNS = ["ville", "modele"] as const;
 
 export type ContactExportRow = {
   phone: string;
@@ -22,8 +24,6 @@ export type ExportContactsMeta = {
   logoPath: string | null;
 };
 
-const BASE_COLUMNS = ["phone", "name", "email"] as const;
-
 function collectVariableKeys(contacts: ContactExportRow[]): string[] {
   const keys = new Set<string>();
   for (const c of contacts) {
@@ -31,7 +31,7 @@ function collectVariableKeys(contacts: ContactExportRow[]): string[] {
     if (v && typeof v === "object" && !Array.isArray(v)) {
       for (const k of Object.keys(v as Record<string, unknown>)) {
         const key = k.trim().toLowerCase();
-        if (key && !(BASE_COLUMNS as readonly string[]).includes(key)) {
+        if (key && !isBaseColumn(key)) {
           keys.add(key);
         }
       }
@@ -47,7 +47,7 @@ function asVariableMap(variables: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(variables as Record<string, unknown>)) {
     const key = k.trim().toLowerCase();
-    if (!key) continue;
+    if (!key || isBaseColumn(key)) continue;
     if (v == null) {
       out[key] = "";
       continue;
@@ -70,6 +70,13 @@ function styleHeaderCell(cell: ExcelJS.Cell) {
   };
 }
 
+/** Force le texte pour que le ré-import ne perde pas le + / les chiffres. */
+function writeTextCell(row: ExcelJS.Row, col: number, value: string) {
+  const cell = row.getCell(col);
+  cell.value = value;
+  cell.numFmt = "@";
+}
+
 export async function buildContactsWorkbook(
   contacts: ContactExportRow[],
   meta: ExportContactsMeta,
@@ -78,11 +85,57 @@ export async function buildContactsWorkbook(
   workbook.creator = "TVS Campaigns";
   workbook.created = meta.exportedAt;
 
+  const varCols =
+    contacts.length === 0
+      ? [...CONTACT_DEFAULT_VARIABLE_COLUMNS]
+      : collectVariableKeys(contacts);
+  const headers = [...CONTACT_BASE_COLUMNS, ...varCols];
+
+  // Feuille Contacts en premier — même fichier = modèle d’import
+  const sheet = workbook.addWorksheet("Contacts", {
+    properties: { defaultColWidth: 16 },
+  });
+
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 22;
+  headers.forEach((header, index) => {
+    const col = index + 1;
+    const column = sheet.getColumn(col);
+    column.width =
+      header === "phone" ? 20 : header === "email" ? 28 : header === "name" ? 22 : 16;
+    // Format texte sur toute la colonne (saisie manuelle + export)
+    column.numFmt = "@";
+    const cell = headerRow.getCell(col);
+    cell.value = header;
+    styleHeaderCell(cell);
+  });
+  headerRow.commit();
+
+  for (const c of contacts) {
+    const vars = asVariableMap(c.variables);
+    const row = sheet.addRow([]);
+    headers.forEach((header, index) => {
+      const col = index + 1;
+      let value = "";
+      if (header === "phone") value = c.phone ?? "";
+      else if (header === "name") value = c.name ?? "";
+      else if (header === "email") value = c.email ?? "";
+      else value = vars[header] ?? "";
+      writeTextCell(row, col, value);
+    });
+  }
+
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: headers.length },
+  };
+
   const info = workbook.addWorksheet("Infos", {
     views: [{ showGridLines: false }],
   });
   info.getColumn(1).width = 4;
-  info.getColumn(2).width = 52;
+  info.getColumn(2).width = 56;
 
   let logoRowEnd = 1;
   if (meta.logoPath) {
@@ -118,55 +171,22 @@ export async function buildContactsWorkbook(
   info.getCell(`B${titleRow + 2}`).value =
     `Exporté le ${meta.exportedAt.toLocaleString("fr-FR")}`;
   info.getCell(`B${titleRow + 3}`).value =
-    "Remplissez la feuille « Contacts » puis réimportez le fichier.";
+    "Ce fichier sert aussi de modèle d’import : modifiez la feuille « Contacts » puis réimportez-le.";
   info.getCell(`B${titleRow + 4}`).value =
-    "Colonnes obligatoires : phone · optionnelles : name, email, variables (ville, modele, …).";
+    "Colonnes : phone (obligatoire, format texte +E.164) · name · email · variables libres.";
   info.getCell(`B${titleRow + 5}`).value =
     contacts.length === 0
-      ? "Aucun contact en base — les en-têtes sont prêts à remplir."
-      : `${contacts.length} contact(s) exporté(s).`;
+      ? "Aucun contact — remplissez les lignes sous les en-têtes puis importez."
+      : `${contacts.length} contact(s) — ne renommez pas les en-têtes phone / name / email.`;
 
-  const sheet = workbook.addWorksheet("Contacts");
-  const varCols =
-    contacts.length === 0
-      ? [...DEFAULT_VARIABLE_COLUMNS]
-      : collectVariableKeys(contacts);
-  const headers = [...BASE_COLUMNS, ...varCols];
-
-  // En-têtes toujours écrits explicitement (même sans ligne de données).
-  const headerRow = sheet.getRow(1);
-  headerRow.height = 22;
-  headers.forEach((header, index) => {
-    const col = index + 1;
-    sheet.getColumn(col).width =
-      header === "phone" ? 18 : header === "email" ? 28 : 16;
-    const cell = headerRow.getCell(col);
-    cell.value = header;
-    styleHeaderCell(cell);
-  });
-  headerRow.commit();
-
-  for (const c of contacts) {
-    const vars = asVariableMap(c.variables);
-    const values = headers.map((header) => {
-      if (header === "phone") return c.phone;
-      if (header === "name") return c.name ?? "";
-      if (header === "email") return c.email ?? "";
-      return vars[header] ?? "";
-    });
-    sheet.addRow(values);
-  }
-
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
-  // Ouvrir directement sur la feuille Contacts (index 1)
   workbook.views = [
     {
       x: 0,
       y: 0,
       width: 12000,
       height: 8000,
-      firstSheet: 1,
-      activeTab: 1,
+      firstSheet: 0,
+      activeTab: 0,
       visibility: "visible",
     },
   ];

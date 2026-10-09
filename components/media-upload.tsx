@@ -28,7 +28,7 @@ export function MediaUpload({
     <div className="surface p-5">
       <h2 className="mb-2 font-medium">Uploader un média</h2>
       <p className="mb-3 text-sm text-[var(--fg-muted)]">
-        Image ≤ 5 Mo (jpeg/png) · Vidéo ≤ 16 Mo (mp4)
+        Image ≤ 5 Mo (jpeg/png) · Vidéo ≤ 30 Mo (mp4)
       </p>
       <input
         type="file"

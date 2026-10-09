@@ -500,8 +500,8 @@ export async function uploadMediaAsset(input: {
   if (isImage && size > 5 * 1024 * 1024) {
     throw new Error("Image max 5 Mo (limite Klambo)");
   }
-  if (isVideo && size > 16 * 1024 * 1024) {
-    throw new Error("Vidéo max 16 Mo (limite Klambo)");
+  if (isVideo && size > 30 * 1024 * 1024) {
+    throw new Error("Vidéo max 30 Mo");
   }
 
   const kind = isImage ? "image" : "video";

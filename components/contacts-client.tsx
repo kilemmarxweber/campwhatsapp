@@ -134,9 +134,9 @@ export function ContactsClient({
         <div className="surface flex flex-col gap-3 p-5">
           <h2 className="font-medium">Import Excel</h2>
           <p className="text-sm text-[var(--fg-muted)]">
-            Colonnes : <code>phone</code> (obligatoire), <code>name</code>,{" "}
-            <code>email</code>, plus variables. Exportez d’abord via l’icône du
-            tableau pour obtenir le modèle.
+            Utilisez le fichier exporté (icône ↓ du tableau) : mêmes colonnes{" "}
+            <code>phone</code>, <code>name</code>, <code>email</code> +
+            variables. Ne renommez pas les en-têtes.
           </p>
           <input
             type="file"

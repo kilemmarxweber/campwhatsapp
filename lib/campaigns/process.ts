@@ -92,7 +92,7 @@ export async function processCampaign(campaignId: string) {
     }
     if (campaign.messageType === "video" && buf.byteLength < 10_000) {
       throw new Error(
-        `Vidéo trop petite (${buf.byteLength} o). Uploadez un vrai fichier MP4 (max 16 Mo).`,
+        `Vidéo trop petite (${buf.byteLength} o). Uploadez un vrai fichier MP4 (max 30 Mo).`,
       );
     }
 
