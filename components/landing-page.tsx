@@ -12,11 +12,15 @@ export function LandingPage({
   return (
     <div className="landing">
       <header className="landing-top">
-        <p className="landing-top__brand">Campagnes</p>
+        <div className="landing-top__brand-stack">
+          <p className="landing-top__klambo">Klambocore</p>
+          <p className="landing-top__brand">Campagnes</p>
+        </div>
       </header>
 
       <section className="landing-hero">
         <div className="landing-hero__copy">
+          <p className="landing-hero__klambo">Klambocore</p>
           <p className="landing-hero__brand">Campagnes</p>
           <h1 className="landing-hero__title">
             WhatsApp &amp; SMS

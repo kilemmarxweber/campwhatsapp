@@ -184,7 +184,7 @@ export function CampaignForm({
                 name,
                 templateId,
                 channel,
-                note,
+                note: note.trim() || undefined,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
               });
@@ -197,7 +197,7 @@ export function CampaignForm({
                 name,
                 templateId,
                 channel,
-                note,
+                note: note.trim() || undefined,
                 contactListId: listId || null,
                 contactIds: listId ? [] : selected,
                 sendNow: channel === "whatsapp" || (channel === "sms" && smsConfigured),
@@ -226,7 +226,13 @@ export function CampaignForm({
             </select>
           </div>
           <div className="field">
-            <label htmlFor="campaign-name">Nom de la campagne</label>
+            <label htmlFor="campaign-name">
+              Nom de la campagne
+              <span className="field-required" aria-hidden>
+                {" "}
+                *
+              </span>
+            </label>
             <input
               id="campaign-name"
               required
@@ -239,6 +245,10 @@ export function CampaignForm({
           <div className="field">
             <label htmlFor="campaign-template">
               Template {channel === "sms" ? "SMS (texte et liens)" : "WhatsApp (image + style + liens)"}
+              <span className="field-required" aria-hidden>
+                {" "}
+                *
+              </span>
             </label>
             <select
               id="campaign-template"
@@ -288,13 +298,13 @@ export function CampaignForm({
           ) : null}
 
           <div className="field">
-            <label htmlFor="campaign-note">Texte additionnel</label>
+            <label htmlFor="campaign-note">Texte additionnel (optionnel)</label>
             <textarea
               id="campaign-note"
-              rows={4}
+              rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ex. Offre valable jusqu’au 30 mars — {{name}}, passez en agence."
+              placeholder="Optionnel — ex. Offre valable jusqu’au 30 mars — {{name}}"
             />
             <div className="mt-2">
               <p className="mb-1.5 text-xs font-medium tracking-wide text-[var(--fg-muted)] uppercase">
@@ -360,7 +370,7 @@ export function CampaignForm({
       <div className="surface p-5">
         <h2 className="mb-3 font-medium">Audience</h2>
         <div className="field mb-4">
-          <label htmlFor="campaign-list">Liste (optionnel)</label>
+          <label htmlFor="campaign-list">Groupe (optionnel)</label>
           <select
             id="campaign-list"
             value={listId}

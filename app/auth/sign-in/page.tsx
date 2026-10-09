@@ -15,6 +15,7 @@ export default function SignInPage() {
           <Link href="/" className="auth-brand__back">
             ← Accueil
           </Link>
+          <p className="auth-brand__klambo">Klambocore</p>
           <p className="auth-brand__mark">Campagnes</p>
           <h2 className="auth-brand__title">
             WhatsApp &amp; SMS

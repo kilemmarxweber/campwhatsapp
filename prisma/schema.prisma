@@ -255,6 +255,7 @@ model Contact {
   name           String?
   email          String?
   variables      Json?
+  archivedAt     DateTime?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -264,6 +265,7 @@ model Contact {
 
   @@unique([organizationId, phone])
   @@index([organizationId])
+  @@index([organizationId, archivedAt])
   @@map("contact")
 }
 

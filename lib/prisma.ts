@@ -2,7 +2,7 @@ import { PrismaClient } from "../prisma/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 /** Bump when the Prisma schema changes so the HMR singleton is recreated. */
-const PRISMA_SCHEMA_REV = 2;
+const PRISMA_SCHEMA_REV = 3;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

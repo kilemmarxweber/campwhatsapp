@@ -25,7 +25,7 @@ export default async function EditCampaignPage({
 
   const [contacts, media, lists, templates] = await Promise.all([
     prisma.contact.findMany({
-      where: { organizationId: org.id },
+      where: { organizationId: org.id, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, phone: true, name: true, variables: true },
     }),

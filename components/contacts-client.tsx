@@ -1,21 +1,39 @@
 "use client";
 
-import { usePendingOverlay } from "@/components/page-loader";
-
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { DownloadIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { DownloadIcon, FolderOpenIcon, SearchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
+import type { CountryCode } from "libphonenumber-js";
 import {
   createContact,
   createContactList,
-  deleteContact,
   deleteContactList,
   importContactsFromExcel,
+  queryContactsPage,
+  type ContactRow,
 } from "@/lib/contacts/actions";
+import { ContactActions } from "@/components/contact-actions";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
+import { LoaderCircle, usePendingOverlay } from "@/components/page-loader";
+import {
+  PhoneInputField,
+  resolvePhoneInput,
+  type PhoneInputValue,
+} from "@/components/phone-input-field";
 import { TablePagination } from "@/components/table-pagination";
 import { Button } from "@/components/ui/button";
+
+function syncContactsUrl(orgSlug: string, q: string, page: number) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  const next = qs
+    ? `/o/${orgSlug}/contacts?${qs}`
+    : `/o/${orgSlug}/contacts`;
+  window.history.replaceState(null, "", next);
+}
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -55,18 +73,22 @@ function filenameFromContentDisposition(header: string | null, fallback: string)
 export function ContactsClient({
   organizationId,
   orgSlug,
+  defaultCountry,
   contacts,
   lists,
   page,
   totalContacts,
+  searchQuery = "",
 }: {
   organizationId: string;
   orgSlug: string;
+  defaultCountry: CountryCode;
   contacts: {
     id: string;
     phone: string;
     name: string | null;
     email: string | null;
+    archivedAt: Date | string | null;
   }[];
   lists: {
     id: string;
@@ -75,13 +97,76 @@ export function ContactsClient({
   }[];
   page: number;
   totalContacts: number;
+  searchQuery?: string;
 }) {
   const router = useRouter();
   const { pending, startTransition } = usePendingOverlay();
-  const [phone, setPhone] = useState("");
+  const [phoneValue, setPhoneValue] = useState<PhoneInputValue>({
+    country: defaultCountry,
+    national: "",
+  });
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [listName, setListName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [searchDraft, setSearchDraft] = useState(searchQuery);
+  const [appliedQuery, setAppliedQuery] = useState(searchQuery);
+  const [tableRows, setTableRows] = useState<ContactRow[]>(contacts);
+  const [tableTotal, setTableTotal] = useState(totalContacts);
+  const [tablePage, setTablePage] = useState(page);
+  const [tableLoading, setTableLoading] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchSkipFirst = useRef(true);
+  const fetchSeq = useRef(0);
+
+  useEffect(() => {
+    setTableRows(contacts);
+    setTableTotal(totalContacts);
+    setTablePage(page);
+    setAppliedQuery(searchQuery);
+    if (document.activeElement !== searchInputRef.current) {
+      setSearchDraft(searchQuery);
+    }
+  }, [contacts, totalContacts, page, searchQuery]);
+
+  async function loadTable(nextQ: string, nextPage: number) {
+    const seq = ++fetchSeq.current;
+    setTableLoading(true);
+    try {
+      const result = await queryContactsPage({
+        organizationId,
+        q: nextQ,
+        page: nextPage,
+      });
+      if (seq !== fetchSeq.current) return;
+      setTableRows(result.contacts);
+      setTableTotal(result.total);
+      setTablePage(result.page);
+      setAppliedQuery(nextQ);
+      syncContactsUrl(orgSlug, nextQ, result.page);
+    } catch (err) {
+      if (seq !== fetchSeq.current) return;
+      toast.error(err instanceof Error ? err.message : "Recherche échouée");
+    } finally {
+      if (seq === fetchSeq.current) setTableLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (searchSkipFirst.current) {
+      searchSkipFirst.current = false;
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      const next = searchDraft.trim();
+      if (next === appliedQuery) return;
+      void loadTable(next, 1);
+    }, 280);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on draft only
+  }, [searchDraft]);
 
   function toggleSelect(id: string) {
     setSelected((prev) =>
@@ -89,24 +174,61 @@ export function ContactsClient({
     );
   }
 
+  function handleImportFile(file: File, input: HTMLInputElement) {
+    setImportFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (!(result instanceof ArrayBuffer)) return;
+      const base64 = arrayBufferToBase64(result);
+      startTransition(async () => {
+        try {
+          const report = await importContactsFromExcel({
+            organizationId,
+            orgSlug,
+            base64,
+            filename: file.name,
+          });
+          toast.success(
+            `${report.created} créés, ${report.updated} maj, ${report.errors.length} erreurs`,
+          );
+          router.refresh();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Import échoué");
+        } finally {
+          input.value = "";
+          setImportFileName(null);
+        }
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   return (
-    <div className="flex flex-col gap-8">
-      <div className="grid gap-6 lg:grid-cols-2">
+    <div className="contacts-page flex flex-col gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
         <form
-          className="surface flex flex-col gap-3 p-5"
+          className="surface contacts-panel flex flex-col gap-2.5 p-3.5"
           onSubmit={(e) => {
             e.preventDefault();
+            const checked = resolvePhoneInput(phoneValue);
+            if (!checked.ok) {
+              toast.error(checked.message);
+              return;
+            }
             startTransition(async () => {
               try {
                 await createContact({
                   organizationId,
                   orgSlug,
-                  phone,
+                  phone: checked.e164,
                   name: name || undefined,
+                  email: email || undefined,
                 });
                 toast.success("Contact ajouté");
-                setPhone("");
+                setPhoneValue({ country: phoneValue.country, national: "" });
                 setName("");
+                setEmail("");
                 router.refresh();
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erreur");
@@ -114,77 +236,88 @@ export function ContactsClient({
             });
           }}
         >
-          <h2 className="font-medium">Ajouter un contact</h2>
-          <div className="field">
-            <label>Téléphone</label>
-            <input
-              required
-              placeholder="+243…"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
+          <h2 className="text-sm font-medium">Ajouter un contact</h2>
+          <PhoneInputField
+            id="contact-phone"
+            required
+            value={phoneValue}
+            onChange={setPhoneValue}
+            disabled={pending}
+          />
+          <div className="contacts-name-email">
+            <div className="field field-sm">
+              <label htmlFor="contact-name">Nom</label>
+              <input
+                id="contact-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Optionnel"
+              />
+            </div>
+            <div className="field field-sm">
+              <label htmlFor="contact-email">Email</label>
+              <input
+                id="contact-email"
+                type="email"
+                autoComplete="email"
+                placeholder="Optionnel"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="field">
-            <label>Nom</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <button className="btn btn-primary" disabled={pending} type="submit">
+          <button
+            className="btn btn-primary btn-sm self-start"
+            disabled={pending}
+            type="submit"
+          >
             Ajouter
           </button>
         </form>
 
-        <div className="surface flex flex-col gap-3 p-5">
-          <h2 className="font-medium">Import Excel</h2>
-          <p className="text-sm text-[var(--fg-muted)]">
-            Utilisez le fichier exporté (icône ↓ du tableau) : mêmes colonnes{" "}
+        <div className="surface contacts-panel flex flex-col gap-2.5 p-3.5">
+          <h2 className="text-sm font-medium">Import Excel</h2>
+          <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
+            Utilisez le fichier exporté (↓ du tableau) : colonnes{" "}
             <code>phone</code>, <code>name</code>, <code>email</code> +
-            variables. Ne renommez pas les en-têtes.
+            variables.
           </p>
           <input
+            ref={importInputRef}
             type="file"
             accept=".xlsx,.xls,.csv"
+            className="sr-only"
+            tabIndex={-1}
             onChange={(e) => {
               const input = e.currentTarget;
               const file = input.files?.[0];
               if (!file) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result;
-                if (!(result instanceof ArrayBuffer)) return;
-                const base64 = arrayBufferToBase64(result);
-                startTransition(async () => {
-                  try {
-                    const report = await importContactsFromExcel({
-                      organizationId,
-                      orgSlug,
-                      base64,
-                      filename: file.name,
-                    });
-                    toast.success(
-                      `${report.created} créés, ${report.updated} maj, ${report.errors.length} erreurs`,
-                    );
-                    router.refresh();
-                  } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Import échoué",
-                    );
-                  } finally {
-                    input.value = "";
-                  }
-                });
-              };
-              reader.readAsArrayBuffer(file);
+              handleImportFile(file, input);
             }}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={pending}
+              onClick={() => importInputRef.current?.click()}
+            >
+              <FolderOpenIcon className="size-3.5" aria-hidden />
+              Parcourir
+            </button>
+            <span className="truncate text-xs text-[var(--fg-muted)]">
+              {importFileName ?? "Aucun fichier sélectionné"}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="surface flex flex-col gap-4 p-5">
+      <div className="surface contacts-panel flex flex-col gap-3 p-3.5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-medium">Listes</h2>
-            <p className="text-sm text-[var(--fg-muted)]">
-              Cochez des contacts puis créez une liste pour les campagnes.
+            <h2 className="text-sm font-medium">Grouper</h2>
+            <p className="text-xs text-[var(--fg-muted)]">
+              Cochez des contacts puis créez un groupe pour les campagnes.
             </p>
           </div>
           <form
@@ -203,7 +336,7 @@ export function ContactsClient({
                     name: listName,
                     contactIds: selected,
                   });
-                  toast.success("Liste créée");
+                  toast.success("Groupe créé");
                   setListName("");
                   setSelected([]);
                   router.refresh();
@@ -213,23 +346,28 @@ export function ContactsClient({
               });
             }}
           >
-            <div className="field">
-              <label>Nom de liste</label>
+            <div className="field field-sm">
+              <label htmlFor="list-name">Nom du groupe</label>
               <input
+                id="list-name"
                 required
                 value={listName}
                 onChange={(e) => setListName(e.target.value)}
                 placeholder="ex. Prospects Kinshasa"
               />
             </div>
-            <button className="btn btn-primary" disabled={pending} type="submit">
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={pending}
+              type="submit"
+            >
               Créer ({selected.length})
             </button>
           </form>
         </div>
         {lists.length === 0 ? (
           <p className="text-sm text-[var(--fg-muted)]">
-            Aucune liste pour l’instant.
+            Aucun groupe pour l’instant.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -246,11 +384,11 @@ export function ContactsClient({
                   </p>
                 </div>
                 <ConfirmAlertDialogButton
-                  className="btn btn-danger"
+                  className="btn btn-danger btn-sm"
                   pending={pending}
                   disabled={pending}
-                  title="Supprimer cette liste ?"
-                  description={`« ${list.name} » sera supprimée. Les contacts ne seront pas effacés.`}
+                  title="Supprimer ce groupe ?"
+                  description={`« ${list.name} » sera supprimé. Les contacts ne seront pas effacés.`}
                   confirmLabel="Supprimer"
                   variant="destructive"
                   onConfirm={() =>
@@ -261,7 +399,7 @@ export function ContactsClient({
                           orgSlug,
                           listId: list.id,
                         });
-                        toast.success("Liste supprimée");
+                        toast.success("Groupe supprimé");
                         router.refresh();
                       } catch (err) {
                         toast.error(
@@ -280,66 +418,126 @@ export function ContactsClient({
       </div>
 
       <div className="surface overflow-x-auto">
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
-          <h2 className="font-medium">Tableau des contacts</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={pending}
-            title="Exporter Excel"
-            aria-label="Exporter les contacts en Excel"
-            onClick={() => {
-              startTransition(async () => {
-                try {
-                  const res = await fetch(
-                    `/api/o/${encodeURIComponent(orgSlug)}/contacts/export`,
-                    { method: "GET", credentials: "same-origin" },
-                  );
-                  if (!res.ok) {
-                    let message = "Export échoué";
-                    try {
-                      const body = (await res.json()) as { message?: string };
-                      if (body.message) message = body.message;
-                    } catch {
-                      // ignore
+        <div className="contacts-table-toolbar">
+          <h2 className="text-sm font-medium">Tableau des contacts</h2>
+          <div className="contacts-table-actions">
+            <div className="contacts-search">
+              <SearchIcon className="contacts-search-icon" aria-hidden />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                placeholder="Rechercher nom ou numéro…"
+                aria-label="Rechercher un contact par nom ou numéro"
+                aria-busy={tableLoading}
+              />
+              {searchDraft ? (
+                <button
+                  type="button"
+                  className="contacts-search-clear"
+                  aria-label="Effacer la recherche"
+                  onClick={() => {
+                    setSearchDraft("");
+                    searchInputRef.current?.focus();
+                  }}
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="contacts-export-btn"
+              disabled={pending}
+              title="Exporter Excel"
+              aria-label="Exporter les contacts en Excel"
+              onClick={() => {
+                startTransition(async () => {
+                  try {
+                    const res = await fetch(
+                      `/api/o/${encodeURIComponent(orgSlug)}/contacts/export`,
+                      { method: "GET", credentials: "same-origin" },
+                    );
+                    if (!res.ok) {
+                      let message = "Export échoué";
+                      try {
+                        const body = (await res.json()) as { message?: string };
+                        if (body.message) message = body.message;
+                      } catch {
+                        // ignore
+                      }
+                      throw new Error(message);
                     }
-                    throw new Error(message);
+                    const blob = await res.blob();
+                    if (blob.size < 32) {
+                      throw new Error("Fichier export vide — réessayez");
+                    }
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    const filename = filenameFromContentDisposition(
+                      res.headers.get("Content-Disposition"),
+                      `contacts-${orgSlug}-${stamp}.xlsx`,
+                    );
+                    triggerBlobDownload(blob, filename);
+                    const countHeader = res.headers.get("X-Contacts-Count");
+                    const count = countHeader
+                      ? Number(countHeader)
+                      : tableTotal;
+                    toast.success(
+                      Number.isFinite(count)
+                        ? `${count} contact(s) exporté(s)`
+                        : "Export téléchargé",
+                    );
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error ? err.message : "Export échoué",
+                    );
                   }
-                  const blob = await res.blob();
-                  if (blob.size < 32) {
-                    throw new Error("Fichier export vide — réessayez");
-                  }
-                  const stamp = new Date().toISOString().slice(0, 10);
-                  const filename = filenameFromContentDisposition(
-                    res.headers.get("Content-Disposition"),
-                    `contacts-${orgSlug}-${stamp}.xlsx`,
-                  );
-                  triggerBlobDownload(blob, filename);
-                  const countHeader = res.headers.get("X-Contacts-Count");
-                  const count = countHeader ? Number(countHeader) : totalContacts;
-                  toast.success(
-                    Number.isFinite(count)
-                      ? `${count} contact(s) exporté(s)`
-                      : "Export téléchargé",
-                  );
-                } catch (err) {
-                  toast.error(
-                    err instanceof Error ? err.message : "Export échoué",
-                  );
-                }
-              });
-            }}
-          >
-            <DownloadIcon />
-          </Button>
+                });
+              }}
+            >
+              <DownloadIcon />
+            </Button>
+          </div>
         </div>
-        {contacts.length === 0 && totalContacts === 0 ? (
-          <div className="p-8 text-center text-[var(--fg-muted)]">
-            Aucun contact — ajoutez-en un ou importez un Excel pour démarrer.
+        {tableRows.length === 0 && tableTotal === 0 ? (
+          <div
+            className={`p-8 text-center text-[var(--fg-muted)] ${
+              tableLoading ? "contacts-table-loading" : ""
+            }`}
+          >
+            {tableLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <LoaderCircle className="size-5" />
+                Recherche…
+              </span>
+            ) : appliedQuery ? (
+              `Aucun contact ne correspond à « ${appliedQuery} ».`
+            ) : (
+              "Aucun contact — ajoutez-en un ou importez un Excel pour démarrer."
+            )}
           </div>
         ) : (
           <>
+            <div
+              className={
+                tableLoading
+                  ? "contacts-table-body is-loading"
+                  : "contacts-table-body"
+              }
+              aria-busy={tableLoading}
+            >
+              {tableLoading ? (
+                <div
+                  className="contacts-table-spinner"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <LoaderCircle className="size-7" />
+                </div>
+              ) : null}
             <table className="table">
               <thead>
                 <tr>
@@ -351,61 +549,68 @@ export function ContactsClient({
                 </tr>
               </thead>
               <tbody>
-                {contacts.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(c.id)}
-                        onChange={() => toggleSelect(c.id)}
-                        aria-label={`Sélectionner ${c.name || c.phone}`}
-                      />
-                    </td>
-                    <td>{c.name || "—"}</td>
-                    <td className="font-mono text-sm">{c.phone}</td>
-                    <td>{c.email || "—"}</td>
-                    <td className="text-right">
-                      <ConfirmAlertDialogButton
-                        className="btn btn-danger"
-                        pending={pending}
-                        disabled={pending}
-                        title="Supprimer ce contact ?"
-                        description={`${c.name || c.phone} sera retiré définitivement de la base destinataires.`}
-                        confirmLabel="Supprimer"
-                        variant="destructive"
-                        onConfirm={() =>
-                          startTransition(async () => {
-                            try {
-                              await deleteContact({
-                                organizationId,
-                                orgSlug,
-                                contactId: c.id,
-                              });
-                              toast.success("Contact supprimé");
-                              setSelected((prev) =>
-                                prev.filter((id) => id !== c.id),
-                              );
-                              router.refresh();
-                            } catch (err) {
-                              toast.error(
-                                err instanceof Error ? err.message : "Erreur",
-                              );
-                            }
-                          })
-                        }
-                      >
-                        Supprimer
-                      </ConfirmAlertDialogButton>
-                    </td>
-                  </tr>
-                ))}
+                {tableRows.map((c) => {
+                  const archived = Boolean(c.archivedAt);
+                  return (
+                    <tr
+                      key={c.id}
+                      className={archived ? "opacity-60" : undefined}
+                    >
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                          disabled={archived}
+                          aria-label={`Sélectionner ${c.name || c.phone}`}
+                        />
+                      </td>
+                      <td>
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          {c.name || "—"}
+                          {archived ? (
+                            <span className="rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--fg-muted)]">
+                              Archivé
+                            </span>
+                          ) : null}
+                        </span>
+                      </td>
+                      <td className="font-mono text-sm">{c.phone}</td>
+                      <td>{c.email || "—"}</td>
+                      <td className="text-right">
+                        <ContactActions
+                          organizationId={organizationId}
+                          orgSlug={orgSlug}
+                          defaultCountry={defaultCountry}
+                          contact={{
+                            id: c.id,
+                            phone: c.phone,
+                            name: c.name,
+                            email: c.email,
+                            archivedAt: c.archivedAt
+                              ? String(c.archivedAt)
+                              : null,
+                          }}
+                          onDeleted={(id) =>
+                            setSelected((prev) => prev.filter((x) => x !== id))
+                          }
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+            </div>
             <TablePagination
               basePath={`/o/${orgSlug}/contacts`}
-              page={page}
-              totalItems={totalContacts}
+              page={tablePage}
+              totalItems={tableTotal}
               label="contacts"
+              query={{ q: appliedQuery || undefined }}
+              onPageChange={(nextPage) => {
+                void loadTable(appliedQuery, nextPage);
+              }}
             />
           </>
         )}

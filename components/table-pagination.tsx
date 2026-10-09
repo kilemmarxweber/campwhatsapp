@@ -7,9 +7,21 @@ export function getPageSize() {
   return PAGE_SIZE;
 }
 
-function pageHref(basePath: string, page: number) {
-  if (page <= 1) return basePath;
-  return `${basePath}?page=${page}`;
+function pageHref(
+  basePath: string,
+  page: number,
+  query?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      const trimmed = value?.trim();
+      if (trimmed) params.set(key, trimmed);
+    }
+  }
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
 }
 
 function pageWindow(current: number, total: number): (number | "…")[] {
@@ -32,18 +44,29 @@ function pageWindow(current: number, total: number): (number | "…")[] {
   return out;
 }
 
+const pageBtnBase =
+  "inline-flex size-9 items-center justify-center rounded-lg text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--tvs-blue-soft)] hover:text-[var(--tvs-blue)]";
+const pageBtnActive =
+  "inline-flex size-9 items-center justify-center rounded-lg bg-[var(--tvs-blue)] text-sm font-semibold text-white shadow-sm";
+
 export function TablePagination({
   basePath,
   page,
   totalItems,
   pageSize = PAGE_SIZE,
   label = "éléments",
+  query,
+  onPageChange,
 }: {
   basePath: string;
   page: number;
   totalItems: number;
   pageSize?: number;
   label?: string;
+  /** Extra query params to preserve across pages (e.g. search `q`). */
+  query?: Record<string, string | undefined>;
+  /** If set, pagination stays client-side (no full navigation). */
+  onPageChange?: (page: number) => void;
 }) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const current = Math.min(Math.max(1, page), totalPages);
@@ -54,6 +77,96 @@ export function TablePagination({
   const to = Math.min(current * pageSize, totalItems);
   const pages = pageWindow(current, totalPages);
 
+  function renderPrev() {
+    const disabled = current <= 1;
+    const className = `btn btn-ghost !px-2 !py-2 ${
+      disabled ? "pointer-events-none opacity-40" : ""
+    }`;
+    if (onPageChange) {
+      return (
+        <button
+          type="button"
+          className={className}
+          disabled={disabled}
+          aria-label="Page précédente"
+          onClick={() => onPageChange(current - 1)}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+      );
+    }
+    return (
+      <Link
+        href={pageHref(basePath, current - 1, query)}
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+        className={className}
+        aria-label="Page précédente"
+      >
+        <ChevronLeft className="size-4" />
+      </Link>
+    );
+  }
+
+  function renderNext() {
+    const disabled = current >= totalPages;
+    const className = `btn btn-ghost !px-2 !py-2 ${
+      disabled ? "pointer-events-none opacity-40" : ""
+    }`;
+    if (onPageChange) {
+      return (
+        <button
+          type="button"
+          className={className}
+          disabled={disabled}
+          aria-label="Page suivante"
+          onClick={() => onPageChange(current + 1)}
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      );
+    }
+    return (
+      <Link
+        href={pageHref(basePath, current + 1, query)}
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+        className={className}
+        aria-label="Page suivante"
+      >
+        <ChevronRight className="size-4" />
+      </Link>
+    );
+  }
+
+  function renderPage(p: number) {
+    const active = p === current;
+    const className = active ? pageBtnActive : pageBtnBase;
+    if (onPageChange) {
+      return (
+        <button
+          key={p}
+          type="button"
+          className={className}
+          aria-current={active ? "page" : undefined}
+          onClick={() => onPageChange(p)}
+        >
+          {p}
+        </button>
+      );
+    }
+    return (
+      <Link
+        key={p}
+        href={pageHref(basePath, p, query)}
+        aria-current={active ? "page" : undefined}
+        className={className}
+      >
+        {p}
+      </Link>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 border-t border-[var(--border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-[var(--fg-muted)]">
@@ -63,22 +176,8 @@ export function TablePagination({
         sur {totalItems} {label}
       </p>
 
-      <nav
-        className="flex items-center gap-1"
-        aria-label="Pagination"
-      >
-        <Link
-          href={pageHref(basePath, current - 1)}
-          aria-disabled={current <= 1}
-          tabIndex={current <= 1 ? -1 : undefined}
-          className={`btn btn-ghost !px-2 !py-2 ${
-            current <= 1 ? "pointer-events-none opacity-40" : ""
-          }`}
-          aria-label="Page précédente"
-        >
-          <ChevronLeft className="size-4" />
-        </Link>
-
+      <nav className="flex items-center gap-1" aria-label="Pagination">
+        {renderPrev()}
         {pages.map((p, i) =>
           p === "…" ? (
             <span
@@ -88,32 +187,10 @@ export function TablePagination({
               …
             </span>
           ) : (
-            <Link
-              key={p}
-              href={pageHref(basePath, p)}
-              aria-current={p === current ? "page" : undefined}
-              className={
-                p === current
-                  ? "inline-flex size-9 items-center justify-center rounded-lg bg-[var(--tvs-blue)] text-sm font-semibold text-white shadow-sm"
-                  : "inline-flex size-9 items-center justify-center rounded-lg text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--tvs-blue-soft)] hover:text-[var(--tvs-blue)]"
-              }
-            >
-              {p}
-            </Link>
+            renderPage(p)
           ),
         )}
-
-        <Link
-          href={pageHref(basePath, current + 1)}
-          aria-disabled={current >= totalPages}
-          tabIndex={current >= totalPages ? -1 : undefined}
-          className={`btn btn-ghost !px-2 !py-2 ${
-            current >= totalPages ? "pointer-events-none opacity-40" : ""
-          }`}
-          aria-label="Page suivante"
-        >
-          <ChevronRight className="size-4" />
-        </Link>
+        {renderNext()}
       </nav>
     </div>
   );

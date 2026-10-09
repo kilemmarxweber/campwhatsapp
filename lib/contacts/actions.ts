@@ -2,12 +2,74 @@
 
 import { revalidatePath } from "next/cache";
 import type { CountryCode } from "libphonenumber-js";
+import type { Prisma } from "@/prisma/generated/prisma/client";
 import prisma from "@/lib/prisma";
 import { requireOrganizationPermission } from "@/lib/auth/organization-permission";
 import { getDefaultCountryForBranch } from "@/lib/klambo/org";
 import { normalizePhone } from "@/lib/phone";
 import { parseContactsExcel } from "@/lib/contacts/import-excel";
 import { buildContactsWorkbook } from "@/lib/contacts/export-excel";
+export type ContactRow = {
+  id: string;
+  phone: string;
+  name: string | null;
+  email: string | null;
+  archivedAt: Date | string | null;
+};
+
+const CONTACTS_PAGE_SIZE = 10;
+
+/** Liste paginée / filtrée — pour recherche client sans reload de page. */
+export async function queryContactsPage(input: {
+  organizationId: string;
+  q?: string;
+  page?: number;
+}): Promise<{ contacts: ContactRow[]; total: number; page: number }> {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["read"],
+  });
+
+  const pageSize = CONTACTS_PAGE_SIZE;
+  const q = (input.q ?? "").trim().slice(0, 80);
+  const page = Math.max(1, input.page ?? 1);
+
+  const where: Prisma.ContactWhereInput = {
+    organizationId: input.organizationId,
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { phone: { contains: q.replace(/[\s().\-]/g, "") } },
+            { phone: { contains: q } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const total = await prisma.contact.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, totalPages);
+
+  const contacts = await prisma.contact.findMany({
+    where,
+    orderBy: [
+      { archivedAt: { sort: "asc", nulls: "first" } },
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      phone: true,
+      name: true,
+      email: true,
+      archivedAt: true,
+    },
+    skip: (currentPage - 1) * pageSize,
+    take: pageSize,
+  });
+
+  return { contacts, total, page: currentPage };
+}
 
 export async function createContact(input: {
   organizationId: string;
@@ -41,6 +103,73 @@ export async function createContact(input: {
   return contact;
 }
 
+export async function updateContact(input: {
+  organizationId: string;
+  orgSlug: string;
+  contactId: string;
+  phone: string;
+  name?: string;
+  email?: string;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["update"],
+  });
+  const existing = await prisma.contact.findFirst({
+    where: { id: input.contactId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Contact introuvable");
+
+  const phone = normalizePhone(
+    input.phone,
+    (await getDefaultCountryForBranch(input.organizationId)) as CountryCode,
+  );
+  if (!phone) throw new Error("Numéro de téléphone invalide");
+
+  const clash = await prisma.contact.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      phone,
+      NOT: { id: existing.id },
+    },
+    select: { id: true },
+  });
+  if (clash) throw new Error("Ce numéro existe déjà");
+
+  await prisma.contact.update({
+    where: { id: existing.id },
+    data: {
+      phone,
+      name: input.name?.trim() || null,
+      email: input.email?.trim() || null,
+    },
+  });
+  revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return { ok: true as const };
+}
+
+export async function setContactArchived(input: {
+  organizationId: string;
+  orgSlug: string;
+  contactId: string;
+  archived: boolean;
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["update"],
+  });
+  const contact = await prisma.contact.findFirst({
+    where: { id: input.contactId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!contact) throw new Error("Contact introuvable");
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { archivedAt: input.archived ? new Date() : null },
+  });
+  revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return { ok: true as const };
+}
+
 export async function deleteContact(input: {
   organizationId: string;
   orgSlug: string;
@@ -58,6 +187,7 @@ export async function deleteContact(input: {
     where: { id: contact.id },
   });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return { ok: true as const };
 }
 
 export async function importContactsFromExcel(input: {
@@ -150,7 +280,7 @@ export async function exportContactsExcel(input: {
   }
 
   const contacts = await prisma.contact.findMany({
-    where: { organizationId: input.organizationId },
+    where: { organizationId: input.organizationId, archivedAt: null },
     orderBy: { createdAt: "desc" },
     select: {
       phone: true,
@@ -191,12 +321,19 @@ export async function createContactList(input: {
   const uniqueIds = [...new Set(input.contactIds)];
   const contacts = uniqueIds.length
     ? await prisma.contact.findMany({
-        where: { organizationId: input.organizationId, id: { in: uniqueIds } },
+        where: {
+          organizationId: input.organizationId,
+          archivedAt: null,
+          id: { in: uniqueIds },
+        },
         select: { id: true },
       })
     : [];
+  if (contacts.length === 0) {
+    throw new Error("Sélectionnez au moins un contact actif");
+  }
   if (contacts.length !== uniqueIds.length) {
-    throw new Error("Un ou plusieurs contacts n'appartiennent pas à cette succursale");
+    throw new Error("Un ou plusieurs contacts sont introuvables ou archivés");
   }
 
   const list = await prisma.contactList.create({
@@ -225,7 +362,7 @@ export async function deleteContactList(input: {
     where: { id: input.listId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!list) throw new Error("Liste introuvable");
+  if (!list) throw new Error("Groupe introuvable");
   await prisma.contactList.delete({ where: { id: list.id } });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
 }

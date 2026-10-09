@@ -58,11 +58,12 @@ async function resolveCampaignContent(input: {
     throw new Error("Le template image/vidéo n'a pas de média");
   }
 
+  const extraNote = input.note?.trim() || undefined;
   const bodyTemplate = template.channel === "sms"
-    ? composeSmsText(template.body, template, input.note)
-    : composeTemplateCaption(template.body, template, input.note);
+    ? composeSmsText(template.body, template, extraNote)
+    : composeTemplateCaption(template.body, template, extraNote);
   if (!bodyTemplate.trim()) {
-    throw new Error("Le message du template est vide");
+    throw new Error("Le message du template est vide — choisissez un template avec du contenu");
   }
 
   return {
@@ -91,11 +92,14 @@ async function resolveCampaignAudience(input: {
       where: { id: input.contactListId, organizationId: input.organizationId },
       select: { id: true },
     });
-    if (!list) throw new Error("Liste introuvable");
+    if (!list) throw new Error("Groupe introuvable");
     const members = await prisma.contactListMember.findMany({
       where: {
         listId: list.id,
-        contact: { organizationId: input.organizationId },
+        contact: {
+          organizationId: input.organizationId,
+          archivedAt: null,
+        },
       },
       select: { contactId: true },
     });
@@ -104,17 +108,18 @@ async function resolveCampaignAudience(input: {
 
   const uniqueIds = [...new Set(contactIds)];
   if (uniqueIds.length === 0) {
-    throw new Error("Sélectionnez au moins un contact ou une liste");
+    throw new Error("Sélectionnez au moins un contact ou un groupe");
   }
 
   const contacts = await prisma.contact.findMany({
     where: {
       organizationId: input.organizationId,
+      archivedAt: null,
       id: { in: uniqueIds },
     },
   });
-  if (contacts.length !== uniqueIds.length) {
-    throw new Error("Un ou plusieurs contacts n'appartiennent pas à cette succursale");
+  if (contacts.length === 0) {
+    throw new Error("Aucun contact actif dans la sélection");
   }
   return contacts;
 }
