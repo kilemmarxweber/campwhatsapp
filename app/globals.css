@@ -886,6 +886,24 @@
   transition: color 0.2s ease;
 }
 
+/* Mobile : « Lire plus » hors flux absolu → sous la carte, sans chevauchement */
+@media (max-width: 899px) {
+  .landing-hero {
+    min-height: auto;
+    padding-bottom: 1.25rem;
+    gap: 1.75rem;
+  }
+
+  .landing-scroll {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    margin: 0.35rem auto 0.25rem;
+    z-index: 1;
+  }
+}
+
 .landing-scroll:hover {
   color: white;
 }
@@ -957,9 +975,93 @@
 }
 
 .landing-hero__btn {
+  position: relative;
+  overflow: hidden;
   min-height: 2.75rem;
   padding-inline: 1.35rem;
   animation: landing-rise 0.7s ease-out 0.12s both;
+}
+
+.landing-hero__btn--electric {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, #7ec8ff 35%, transparent),
+    0 0 18px color-mix(in oklab, #3d9cff 35%, transparent),
+    0 0 36px color-mix(in oklab, var(--tvs-blue) 28%, transparent);
+  animation:
+    landing-rise 0.7s ease-out 0.12s both,
+    landing-electric-glow 2.4s ease-in-out 0.8s infinite;
+}
+
+.landing-hero__btn--electric::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 38%,
+    color-mix(in oklab, #d9efff 55%, transparent) 48%,
+    color-mix(in oklab, #7ec8ff 70%, transparent) 52%,
+    transparent 62%,
+    transparent 100%
+  );
+  background-size: 240% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+  animation: landing-electric-sheen 2.6s linear infinite;
+  pointer-events: none;
+}
+
+.landing-hero__btn-spark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.landing-hero__btn-spark::before,
+.landing-hero__btn-spark::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 38%;
+  top: 50%;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    #f2f9ff,
+    #7ec8ff,
+    transparent
+  );
+  box-shadow: 0 0 10px #9fd4ff;
+  opacity: 0;
+  animation: landing-electric-bolt 2.4s ease-in-out infinite;
+}
+
+.landing-hero__btn-spark::before {
+  left: 12%;
+  transform: translateY(-50%) rotate(18deg);
+}
+
+.landing-hero__btn-spark::after {
+  right: 14%;
+  transform: translateY(-50%) rotate(-16deg);
+  animation-delay: 1.2s;
+}
+
+.landing-hero__btn-label {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-hero__btn--electric:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, #b8e0ff 55%, transparent),
+    0 0 22px color-mix(in oklab, #6eb6ff 45%, transparent),
+    0 0 42px color-mix(in oklab, var(--tvs-blue) 35%, transparent);
 }
 
 .landing-visual {
@@ -1158,6 +1260,15 @@
   background:
     linear-gradient(135deg, color-mix(in oklab, var(--tvs-red) 45%, #2a180f), transparent),
     linear-gradient(180deg, #2a3a66, #1a2544);
+}
+
+.landing-visual__media-img {
+  display: block;
+  width: 100%;
+  height: 4.75rem;
+  object-fit: cover;
+  border-radius: 0.55rem;
+  background: #1a2544;
 }
 
 .landing-visual__bubble--sms {
@@ -1383,6 +1494,54 @@
   }
 }
 
+@keyframes landing-electric-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, #7ec8ff 30%, transparent),
+      0 0 14px color-mix(in oklab, #3d9cff 28%, transparent),
+      0 0 28px color-mix(in oklab, var(--tvs-blue) 22%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, #c7e9ff 65%, transparent),
+      0 0 26px color-mix(in oklab, #7ec8ff 55%, transparent),
+      0 0 48px color-mix(in oklab, #4aa3ff 40%, transparent);
+  }
+}
+
+@keyframes landing-electric-sheen {
+  0% {
+    background-position: 140% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+@keyframes landing-electric-bolt {
+  0%,
+  62%,
+  100% {
+    opacity: 0;
+    filter: brightness(1);
+  }
+  68% {
+    opacity: 1;
+    filter: brightness(1.6);
+  }
+  74% {
+    opacity: 0.15;
+  }
+  80% {
+    opacity: 0.95;
+    filter: brightness(1.8);
+  }
+  88% {
+    opacity: 0;
+  }
+}
+
 /* Flip carte vers la droite : face → dos → face */
 @keyframes landing-card-flip {
   0% {
@@ -1399,6 +1558,10 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-hero__copy,
   .landing-hero__btn,
+  .landing-hero__btn--electric,
+  .landing-hero__btn--electric::before,
+  .landing-hero__btn-spark::before,
+  .landing-hero__btn-spark::after,
   .landing-visual,
   .landing-visual__bubble,
   .landing-visual__glow,

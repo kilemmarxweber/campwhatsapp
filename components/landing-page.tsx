@@ -6,21 +6,25 @@ import {
 
 export function LandingPage({
   organizations,
+  promoPreview = null,
 }: {
   organizations: LandingOrgShowcase[];
+  promoPreview?: {
+    title: string;
+    imageUrl: string;
+    imageAlt: string;
+  } | null;
 }) {
   return (
     <div className="landing">
       <header className="landing-top">
         <div className="landing-top__brand-stack">
-          <p className="landing-top__klambo">Klambocore</p>
           <p className="landing-top__brand">Campagnes</p>
         </div>
       </header>
 
       <section className="landing-hero">
         <div className="landing-hero__copy">
-          <p className="landing-hero__klambo">Klambocore</p>
           <p className="landing-hero__brand">Campagnes</p>
           <h1 className="landing-hero__title">
             Klambocore Campagnes
@@ -33,12 +37,19 @@ export function LandingPage({
             vidéo — via WhatsApp et SMS, du siège jusqu’au terrain.
           </p>
           <div className="landing-hero__cta">
-            <Link href="/auth/sign-in" className="btn btn-primary landing-hero__btn">
-              Se connecter
+            <Link
+              href="/auth/sign-in"
+              className="btn btn-primary landing-hero__btn landing-hero__btn--electric"
+            >
+              <span className="landing-hero__btn-spark" aria-hidden />
+              <span className="landing-hero__btn-label">Se connecter</span>
             </Link>
           </div>
         </div>
-        <LandingHeroVisual organizations={organizations} />
+        <LandingHeroVisual
+          organizations={organizations}
+          promoPreview={promoPreview}
+        />
         <a
           href="#landing-suite"
           className="landing-scroll"

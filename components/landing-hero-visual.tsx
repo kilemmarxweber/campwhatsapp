@@ -11,14 +11,22 @@ export type LandingOrgShowcase = {
   messagesFailed: number;
 };
 
+export type LandingPromoPreview = {
+  title: string;
+  imageUrl: string;
+  imageAlt: string;
+};
+
 function formatCount(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n);
 }
 
 export function LandingHeroVisual({
   organizations,
+  promoPreview = null,
 }: {
   organizations: LandingOrgShowcase[];
+  promoPreview?: LandingPromoPreview | null;
 }) {
   const items =
     organizations.length > 0
@@ -80,8 +88,22 @@ export function LandingHeroVisual({
                   Bonjour {"{{name}}"}, votre HLX 150 est prêt en concession.
                 </div>
                 <div className="landing-visual__bubble landing-visual__bubble--media">
-                  <span className="landing-visual__media-bar" />
-                  <span>Promo week-end · image + 2 liens</span>
+                  {promoPreview?.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className="landing-visual__media-img"
+                      src={promoPreview.imageUrl}
+                      alt={promoPreview.imageAlt}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="landing-visual__media-bar" />
+                  )}
+                  <span>
+                    {promoPreview?.title
+                      ? `${promoPreview.title} · image + 2 liens`
+                      : "Promo week-end · image + 2 liens"}
+                  </span>
                 </div>
                 <div className="landing-visual__bubble landing-visual__bubble--sms">
                   SMS · Rappels &amp; confirmations

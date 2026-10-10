@@ -7,6 +7,7 @@ import { LandingPage } from "@/components/landing-page";
 import { SiteJsonLd } from "@/components/site-json-ld";
 import type { LandingOrgShowcase } from "@/components/landing-hero-visual";
 import { SITE } from "@/lib/site";
+import { publicUploadUrl } from "@/lib/upload-url";
 
 export const metadata: Metadata = {
   title: {
@@ -25,26 +26,54 @@ export default async function HomePage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (session?.user) redirect("/dashboard");
 
-  const tenants = await prisma.tenantOrganization.findMany({
-    where: { archivedAt: null },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      branches: {
-        where: { archivedAt: null },
-        select: {
-          id: true,
-          _count: {
-            select: {
-              contacts: true,
-              campaigns: true,
+  const [tenants, imageTemplate] = await Promise.all([
+    prisma.tenantOrganization.findMany({
+      where: { archivedAt: null },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        branches: {
+          where: { archivedAt: null },
+          select: {
+            id: true,
+            _count: {
+              select: {
+                contacts: true,
+                campaigns: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    }),
+    prisma.messageTemplate.findFirst({
+      where: {
+        messageType: "image",
+        channel: "whatsapp",
+        mediaId: { not: null },
+        media: { kind: "image" },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        name: true,
+        media: {
+          select: {
+            storagePath: true,
+            filename: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const promoPreview = imageTemplate?.media
+    ? {
+        title: imageTemplate.name,
+        imageUrl: publicUploadUrl(imageTemplate.media.storagePath),
+        imageAlt: imageTemplate.media.filename || imageTemplate.name,
+      }
+    : null;
 
   const organizations: LandingOrgShowcase[] = await Promise.all(
     tenants.map(async (tenant) => {
@@ -98,7 +127,7 @@ export default async function HomePage() {
   return (
     <>
       <SiteJsonLd />
-      <LandingPage organizations={organizations} />
+      <LandingPage organizations={organizations} promoPreview={promoPreview} />
     </>
   );
 }
