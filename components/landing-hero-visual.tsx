@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 
+export type LandingPromoPreview = {
+  title: string;
+  imageUrl: string;
+  imageAlt: string;
+};
+
 export type LandingOrgShowcase = {
   id: string;
   name: string;
@@ -9,12 +15,7 @@ export type LandingOrgShowcase = {
   campaigns: number;
   messagesOk: number;
   messagesFailed: number;
-};
-
-export type LandingPromoPreview = {
-  title: string;
-  imageUrl: string;
-  imageAlt: string;
+  promoPreview?: LandingPromoPreview | null;
 };
 
 function formatCount(n: number) {
@@ -23,11 +24,9 @@ function formatCount(n: number) {
 
 export function LandingHeroVisual({
   organizations,
-  promoPreview = null,
   onEruptingChange,
 }: {
   organizations: LandingOrgShowcase[];
-  promoPreview?: LandingPromoPreview | null;
   onEruptingChange?: (erupting: boolean) => void;
 }) {
   const items =
@@ -41,6 +40,7 @@ export function LandingHeroVisual({
             campaigns: 0,
             messagesOk: 0,
             messagesFailed: 0,
+            promoPreview: null,
           },
         ];
 
@@ -76,6 +76,7 @@ export function LandingHeroVisual({
   }, [items.length]);
 
   const org = items[index] ?? items[0]!;
+  const promo = org.promoPreview ?? null;
   const totalMessages = org.messagesOk + org.messagesFailed;
 
   return (
@@ -122,20 +123,20 @@ export function LandingHeroVisual({
                   Bonjour {"{{name}}"}, votre HLX 150 est prêt en concession.
                 </div>
                 <div className="landing-visual__bubble landing-visual__bubble--media">
-                  {promoPreview?.imageUrl ? (
+                  {promo?.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       className="landing-visual__media-img"
-                      src={promoPreview.imageUrl}
-                      alt={promoPreview.imageAlt}
+                      src={promo.imageUrl}
+                      alt={promo.imageAlt}
                       loading="lazy"
                     />
                   ) : (
                     <span className="landing-visual__media-bar" />
                   )}
                   <span>
-                    {promoPreview?.title
-                      ? `${promoPreview.title} · image + 2 liens`
+                    {promo?.title
+                      ? `${promo.title} · image + 2 liens`
                       : "Promo week-end · image + 2 liens"}
                   </span>
                 </div>

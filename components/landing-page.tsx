@@ -13,14 +13,8 @@ import {
 
 export function LandingPage({
   organizations,
-  promoPreview = null,
 }: {
   organizations: LandingOrgShowcase[];
-  promoPreview?: {
-    title: string;
-    imageUrl: string;
-    imageAlt: string;
-  } | null;
 }) {
   const [erupting, setErupting] = useState(false);
   const brandCycle = useLandingBrandCycle();
@@ -58,7 +52,6 @@ export function LandingPage({
         </div>
         <LandingHeroVisual
           organizations={organizations}
-          promoPreview={promoPreview}
           onEruptingChange={setErupting}
         />
         <a
