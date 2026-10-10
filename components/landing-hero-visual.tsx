@@ -24,9 +24,11 @@ function formatCount(n: number) {
 export function LandingHeroVisual({
   organizations,
   promoPreview = null,
+  onEruptingChange,
 }: {
   organizations: LandingOrgShowcase[];
   promoPreview?: LandingPromoPreview | null;
+  onEruptingChange?: (erupting: boolean) => void;
 }) {
   const items =
     organizations.length > 0
@@ -44,14 +46,28 @@ export function LandingHeroVisual({
 
   const [index, setIndex] = useState(0);
   const [flipping, setFlipping] = useState(false);
+  const [commsActive, setCommsActive] = useState(false);
+  const [commsToken, setCommsToken] = useState(0);
+
+  useEffect(() => {
+    onEruptingChange?.(commsActive);
+  }, [commsActive, onEruptingChange]);
+
+  useEffect(() => {
+    if (!commsActive) return;
+    const timer = window.setTimeout(() => setCommsActive(false), 25_000);
+    return () => window.clearTimeout(timer);
+  }, [commsActive, commsToken]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
       setIndex((prev) => {
         const next = (prev + 1) % items.length;
-        // Fin de boucle → flip une fois vers la droite
+        // Fin de boucle → flip + effets communication (~25s)
         if (next === 0) {
           setFlipping(true);
+          setCommsActive(true);
+          setCommsToken((token) => token + 1);
         }
         return next;
       });
@@ -63,8 +79,26 @@ export function LandingHeroVisual({
   const totalMessages = org.messagesOk + org.messagesFailed;
 
   return (
-    <div className="landing-visual" aria-hidden>
+    <div
+      className={`landing-visual${commsActive ? " is-erupting" : ""}`}
+      aria-hidden
+    >
       <div className="landing-visual__glow" />
+      <div className="landing-visual__comms">
+        <span className="landing-visual__wave landing-visual__wave--1" />
+        <span className="landing-visual__wave landing-visual__wave--2" />
+        <span className="landing-visual__wave landing-visual__wave--3" />
+        <span className="landing-visual__ping landing-visual__ping--1" />
+        <span className="landing-visual__ping landing-visual__ping--2" />
+        <span className="landing-visual__chip landing-visual__chip--wa">WA</span>
+        <span className="landing-visual__chip landing-visual__chip--sms">SMS</span>
+        <span className="landing-visual__mini-bubble landing-visual__mini-bubble--1" />
+        <span className="landing-visual__mini-bubble landing-visual__mini-bubble--2" />
+        <span className="landing-visual__packet landing-visual__packet--1" />
+        <span className="landing-visual__packet landing-visual__packet--2" />
+        <span className="landing-visual__packet landing-visual__packet--3" />
+        <span className="landing-visual__packet landing-visual__packet--4" />
+      </div>
       <div className="landing-visual__stage">
         <div
           className={`landing-visual__device${flipping ? " is-flipping" : ""}`}

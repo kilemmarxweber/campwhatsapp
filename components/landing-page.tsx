@@ -1,4 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import {
+  LandingBrandCycle,
+  useLandingBrandCycle,
+} from "@/components/landing-brand-cycle";
 import {
   LandingHeroVisual,
   type LandingOrgShowcase,
@@ -15,21 +22,24 @@ export function LandingPage({
     imageAlt: string;
   } | null;
 }) {
+  const [erupting, setErupting] = useState(false);
+  const brandCycle = useLandingBrandCycle();
+
   return (
-    <div className="landing">
+    <div className={`landing${erupting ? " is-erupting" : ""}`}>
       <header className="landing-top">
         <div className="landing-top__brand-stack">
-          <p className="landing-top__brand">Campagnes</p>
+          <LandingBrandCycle className="landing-top__brand" {...brandCycle} />
         </div>
       </header>
 
       <section className="landing-hero">
         <div className="landing-hero__copy">
-          <p className="landing-hero__brand">Campagnes</p>
+          <LandingBrandCycle className="landing-hero__brand" {...brandCycle} />
           <h1 className="landing-hero__title">
             Klambocore Campagnes
             <span className="landing-hero__title-line">
-              WhatsApp &amp; SMS pour chaque entreprise
+              WhatsApp &amp; SMS pour votre entreprise
             </span>
           </h1>
           <p className="landing-hero__lead">
@@ -49,6 +59,7 @@ export function LandingPage({
         <LandingHeroVisual
           organizations={organizations}
           promoPreview={promoPreview}
+          onEruptingChange={setErupting}
         />
         <a
           href="#landing-suite"
