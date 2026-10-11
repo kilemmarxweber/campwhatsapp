@@ -228,6 +228,227 @@
   line-height: 1.2;
 }
 
+.contact-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-group-row {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface, white) 92%, var(--tvs-blue) 4%);
+}
+
+.contact-group-row__main {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.35rem;
+}
+
+.contact-group-row__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.contact-group-row__open:hover,
+.contact-group-row__open[data-popup-open] {
+  background: color-mix(in oklab, var(--tvs-blue) 8%, transparent);
+}
+
+.contact-group-row__icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  color: var(--tvs-blue-deep);
+  background: color-mix(in oklab, var(--tvs-blue) 12%, transparent);
+}
+
+.contact-group-row__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-group-row__name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-group-row__count {
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.contact-group-row__chevron {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  transition: transform 0.18s ease;
+}
+
+.contact-group-row__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.contact-group-row__delete {
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0 !important;
+  flex-shrink: 0;
+}
+
+.contact-group-menu__empty,
+.contact-group-menu__hint {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.contact-group-menu__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.55rem 0.45rem;
+}
+
+.contact-group-menu__select-all,
+.contact-group-menu__bulk-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--tvs-blue-deep);
+}
+
+.contact-group-menu__bulk-remove {
+  color: var(--tvs-red);
+}
+
+.contact-group-menu__select-all:disabled,
+.contact-group-menu__bulk-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.contact-group-menu__list {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.contact-group-menu__item {
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.contact-group-menu__check {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  accent-color: var(--tvs-blue);
+  cursor: pointer;
+}
+
+.contact-group-menu__member {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-group-menu__member-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-group-menu__member-phone {
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+}
+
+.contact-group-menu__badge {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+}
+
+.contact-group-menu__remove {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.contact-group-menu__remove:hover {
+  background: color-mix(in oklab, var(--tvs-red) 12%, transparent);
+  color: var(--tvs-red);
+}
+
+.contact-group-menu__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.35rem 0.35rem 0.45rem;
+}
+
 .contacts-name-email {
   display: grid;
   grid-template-columns: 1fr 1fr;

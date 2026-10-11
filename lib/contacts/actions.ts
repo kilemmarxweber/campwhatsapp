@@ -386,3 +386,95 @@ export async function deleteContactList(input: {
   revalidatePath(`/o/${input.orgSlug}/contacts`);
 }
 
+export async function addContactsToList(input: {
+  organizationId: string;
+  orgSlug: string;
+  listId: string;
+  contactIds: string[];
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["update"],
+  });
+
+  const list = await prisma.contactList.findFirst({
+    where: { id: input.listId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!list) throw new Error("Groupe introuvable");
+
+  const uniqueIds = [...new Set(input.contactIds)];
+  if (uniqueIds.length === 0) {
+    throw new Error("Sélectionnez au moins un contact");
+  }
+
+  const contacts = await prisma.contact.findMany({
+    where: {
+      organizationId: input.organizationId,
+      archivedAt: null,
+      id: { in: uniqueIds },
+    },
+    select: { id: true },
+  });
+  if (contacts.length === 0) {
+    throw new Error("Aucun contact actif à ajouter");
+  }
+
+  await prisma.contactListMember.createMany({
+    data: contacts.map((contact) => ({
+      listId: list.id,
+      contactId: contact.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return { added: contacts.length };
+}
+
+export async function removeContactFromList(input: {
+  organizationId: string;
+  orgSlug: string;
+  listId: string;
+  contactId: string;
+}) {
+  const result = await removeContactsFromList({
+    organizationId: input.organizationId,
+    orgSlug: input.orgSlug,
+    listId: input.listId,
+    contactIds: [input.contactId],
+  });
+  if (result.removed === 0) throw new Error("Contact absent de ce groupe");
+}
+
+export async function removeContactsFromList(input: {
+  organizationId: string;
+  orgSlug: string;
+  listId: string;
+  contactIds: string[];
+}) {
+  await requireOrganizationPermission(input.organizationId, {
+    contacts: ["update"],
+  });
+
+  const list = await prisma.contactList.findFirst({
+    where: { id: input.listId, organizationId: input.organizationId },
+    select: { id: true },
+  });
+  if (!list) throw new Error("Groupe introuvable");
+
+  const uniqueIds = [...new Set(input.contactIds)];
+  if (uniqueIds.length === 0) {
+    throw new Error("Sélectionnez au moins un contact");
+  }
+
+  const result = await prisma.contactListMember.deleteMany({
+    where: {
+      listId: list.id,
+      contactId: { in: uniqueIds },
+    },
+  });
+
+  revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return { removed: result.count };
+}
+

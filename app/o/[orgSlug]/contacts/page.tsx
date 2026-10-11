@@ -53,7 +53,18 @@ export default async function ContactsPage({
       select: {
         id: true,
         name: true,
-        _count: { select: { members: true } },
+        members: {
+          select: {
+            contact: {
+              select: {
+                id: true,
+                phone: true,
+                name: true,
+                archivedAt: true,
+              },
+            },
+          },
+        },
       },
     }),
     getDefaultCountryForBranch(org.id),
@@ -97,7 +108,17 @@ export default async function ContactsPage({
         orgSlug={orgSlug}
         defaultCountry={defaultCountry}
         contacts={contacts}
-        lists={lists}
+        lists={lists.map((list) => ({
+          id: list.id,
+          name: list.name,
+          members: list.members
+            .map((m) => m.contact)
+            .sort((a, b) => {
+              const an = (a.name || a.phone).toLocaleLowerCase("fr");
+              const bn = (b.name || b.phone).toLocaleLowerCase("fr");
+              return an.localeCompare(bn, "fr");
+            }),
+        }))}
         page={currentPage}
         totalContacts={totalContacts}
         searchQuery={q}

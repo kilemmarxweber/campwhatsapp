@@ -8,13 +8,15 @@ import type { CountryCode } from "libphonenumber-js";
 import {
   createContact,
   createContactList,
-  deleteContactList,
   importContactsFromExcel,
   queryContactsPage,
   type ContactRow,
 } from "@/lib/contacts/actions";
 import { ContactActions } from "@/components/contact-actions";
-import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
+import {
+  ContactGroupRow,
+  type ContactGroupList,
+} from "@/components/contact-group-row";
 import { LoaderCircle, usePendingOverlay } from "@/components/page-loader";
 import {
   PhoneInputField,
@@ -99,11 +101,7 @@ export function ContactsClient({
     email: string | null;
     archivedAt: Date | string | null;
   }[];
-  lists: {
-    id: string;
-    name: string;
-    _count: { members: number };
-  }[];
+  lists: ContactGroupList[];
   page: number;
   totalContacts: number;
   searchQuery?: string;
@@ -346,7 +344,8 @@ export function ContactsClient({
           <div>
             <h2 className="text-sm font-medium">Grouper</h2>
             <p className="text-xs text-[var(--fg-muted)]">
-              Cochez des contacts puis créez un groupe pour les campagnes.
+              Créez un groupe, ouvrez-le pour voir les membres, ajouter ou retirer
+              des contacts.
             </p>
           </div>
           <form
@@ -401,48 +400,18 @@ export function ContactsClient({
             Aucun groupe pour l’instant.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="contact-group-list">
             {lists.map((list) => (
-              <li
+              <ContactGroupRow
                 key={list.id}
-                className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2"
-              >
-                <div>
-                  <p className="font-medium">{list.name}</p>
-                  <p className="text-sm text-[var(--fg-muted)]">
-                    {list._count.members} contact
-                    {list._count.members === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <ConfirmAlertDialogButton
-                  className="btn btn-danger btn-sm"
-                  pending={pending}
-                  disabled={pending}
-                  title="Supprimer ce groupe ?"
-                  description={`« ${list.name} » sera supprimé. Les contacts ne seront pas effacés.`}
-                  confirmLabel="Supprimer"
-                  variant="destructive"
-                  onConfirm={() =>
-                    startTransition(async () => {
-                      try {
-                        await deleteContactList({
-                          organizationId,
-                          orgSlug,
-                          listId: list.id,
-                        });
-                        toast.success("Groupe supprimé");
-                        router.refresh();
-                      } catch (err) {
-                        toast.error(
-                          err instanceof Error ? err.message : "Erreur",
-                        );
-                      }
-                    })
-                  }
-                >
-                  Supprimer
-                </ConfirmAlertDialogButton>
-              </li>
+                list={list}
+                organizationId={organizationId}
+                orgSlug={orgSlug}
+                selectedIds={selected}
+                pending={pending}
+                startTransition={startTransition}
+                onChanged={() => router.refresh()}
+              />
             ))}
           </ul>
         )}
