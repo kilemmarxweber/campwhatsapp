@@ -73,7 +73,7 @@ export default function RootLayout({
   return (
     <html
       lang={SITE.language}
-      className={cn("h-full font-sans", display.variable, mono.variable)}
+      className={cn("font-sans", display.variable, mono.variable)}
     >
       <body className="min-h-full antialiased">
         {children}

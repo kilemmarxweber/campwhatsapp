@@ -43,7 +43,7 @@ export function AppHeader({
             "linear-gradient(90deg, var(--tvs-blue) 0%, var(--tvs-blue) 55%, var(--tvs-red) 55%, var(--tvs-red) 100%)",
         }}
       />
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
+      <div className="mx-auto flex w-full min-w-0 max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <div className="flex min-w-0 items-center gap-4">
           <Link href={homeHref} className="brand-mark shrink-0 text-base uppercase">
             {brand}

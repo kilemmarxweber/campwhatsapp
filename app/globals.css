@@ -106,11 +106,15 @@
   }
 
   html {
-    @apply font-sans h-full;
+    @apply font-sans;
+    height: auto;
+    min-height: 100%;
   }
 
   body {
-    @apply min-h-full text-foreground antialiased;
+    @apply text-foreground antialiased;
+    height: auto;
+    min-height: 100%;
     margin: 0;
     background:
       radial-gradient(
@@ -1020,14 +1024,21 @@
 
 /* ── Landing ─────────────────────────────────────────── */
 
-/* La route / doit défiler dans tous les navigateurs.
-   html.h-full fige la hauteur : on la relâche seulement ici.
-   Le clip reste sur .landing pour ne pas transformer html/body en zone de scroll. */
-html:has(.landing),
-body:has(.landing) {
+/* Hauteur relâchée partout : html ne doit pas rester à 100 % de la fenêtre,
+   sinon le document ne défile pas dans certains navigateurs. */
+html,
+body {
   height: auto;
   min-height: 100%;
   max-width: 100%;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
 }
 
 .landing {
@@ -1048,6 +1059,7 @@ body:has(.landing) {
 }
 
 @supports not (overflow: clip) {
+  .app-shell,
   .landing,
   .landing-visual {
     overflow-x: hidden;

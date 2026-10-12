@@ -21,7 +21,7 @@ export function AppNav({ items }: { items: AppNavItem[] }) {
   const hrefs = items.map((item) => item.href);
 
   return (
-    <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-6 pb-3">
+    <nav className="mx-auto flex w-full min-w-0 max-w-6xl gap-1 overflow-x-auto overscroll-x-contain px-6 pb-3">
       {items.map((item) => {
         const active = isActive(pathname, item.href, hrefs);
 

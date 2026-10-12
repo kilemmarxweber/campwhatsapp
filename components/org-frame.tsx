@@ -82,7 +82,7 @@ export function OrgFrame({
   return (
     <OrgAppearanceContext.Provider value={{ locale, setLocale, colors, setColors, copy }}>
       <div
-        className="min-h-screen"
+        className="app-shell"
         style={appearanceCssVars(colors) as CSSProperties}
         lang={intlLocale(locale)}
       >
