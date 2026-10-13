@@ -197,9 +197,22 @@ export function ContactsClient({
             base64,
             filename: file.name,
           });
-          toast.success(
-            `${report.created} créés, ${report.updated} maj, ${report.errors.length} erreurs`,
-          );
+          const parts = [`${report.created} créé${report.created > 1 ? "s" : ""}`];
+          if (report.skipped > 0) {
+            parts.push(
+              `${report.skipped} déjà existant${report.skipped > 1 ? "s" : ""} (ignoré${report.skipped > 1 ? "s" : ""})`,
+            );
+          }
+          if (report.errors.length > 0) {
+            parts.push(
+              `${report.errors.length} erreur${report.errors.length > 1 ? "s" : ""}`,
+            );
+          }
+          if (report.skipped > 0 || report.errors.length > 0) {
+            toast.message(`Import terminé : ${parts.join(", ")}`);
+          } else {
+            toast.success(`Import terminé : ${parts.join(", ")}`);
+          }
           router.refresh();
         } catch (err) {
           toastCaughtError(err, "Import échoué");

@@ -265,14 +265,21 @@ export async function importContactsFromExcel(input: {
   const rows = parseContactsExcel(buffer, country);
 
   let created = 0;
-  let updated = 0;
+  let skipped = 0;
   const errors: { row: number; reason: string }[] = [];
+  const seenInFile = new Set<string>();
 
   for (const row of rows) {
     if (!row.ok) {
       errors.push({ row: row.row, reason: row.reason });
       continue;
     }
+    if (seenInFile.has(row.phone)) {
+      skipped += 1;
+      continue;
+    }
+    seenInFile.add(row.phone);
+
     const existing = await prisma.contact.findUnique({
       where: {
         organizationId_phone: {
@@ -280,21 +287,14 @@ export async function importContactsFromExcel(input: {
           phone: row.phone,
         },
       },
+      select: { id: true },
     });
     if (existing) {
-      await prisma.contact.update({
-        where: { id: existing.id },
-        data: {
-          name: row.name ?? existing.name,
-          email: row.email ?? existing.email,
-          variables: {
-            ...((existing.variables as Record<string, string>) ?? {}),
-            ...row.variables,
-          },
-        },
-      });
-      updated += 1;
-    } else {
+      skipped += 1;
+      continue;
+    }
+
+    try {
       await prisma.contact.create({
         data: {
           organizationId: input.organizationId,
@@ -305,11 +305,21 @@ export async function importContactsFromExcel(input: {
         },
       });
       created += 1;
+    } catch (err) {
+      const message = prismaActionMessage(err, "");
+      if (message.includes("existe déjà") || message.includes("déjà")) {
+        skipped += 1;
+        continue;
+      }
+      errors.push({
+        row: row.row,
+        reason: message || "Enregistrement impossible",
+      });
     }
   }
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { created, updated, errors, filename: input.filename };
+  return { created, skipped, errors, filename: input.filename };
 }
 
 export async function exportContactsExcel(input: {
