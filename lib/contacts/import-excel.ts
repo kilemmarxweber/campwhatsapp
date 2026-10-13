@@ -13,6 +13,7 @@ import {
 export type ImportRowResult =
   | {
       ok: true;
+      row: number;
       phone: string;
       name?: string;
       email?: string;
@@ -158,6 +159,7 @@ export function parseContactsExcel(
 
     return {
       ok: true as const,
+      row: excelRow,
       phone,
       name,
       email,
