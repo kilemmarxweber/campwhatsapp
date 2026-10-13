@@ -5,6 +5,7 @@ import { usePendingOverlay } from "@/components/page-loader";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import {
   deleteGlobalRole,
   upsertGlobalRole,
@@ -153,9 +154,7 @@ export function RolesAdminClient({ roles }: { roles: RoleRow[] }) {
                             toast.success("Rôle supprimé");
                             router.refresh();
                           } catch (err) {
-                            toast.error(
-                              err instanceof Error ? err.message : "Erreur",
-                            );
+                            toastCaughtError(err);
                           }
                         });
                       }}
@@ -255,9 +254,7 @@ export function RolesAdminClient({ roles }: { roles: RoleRow[] }) {
                     setDraft(null);
                     router.refresh();
                   } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Erreur",
-                    );
+                    toastCaughtError(err);
                   }
                 });
               }}

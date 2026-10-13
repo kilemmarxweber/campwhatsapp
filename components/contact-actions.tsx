@@ -166,7 +166,7 @@ export function ContactActions({
               }
               startTransition(async () => {
                 try {
-                  await updateContact({
+                  const result = await updateContact({
                     organizationId,
                     orgSlug,
                     contactId: contact.id,
@@ -176,11 +176,15 @@ export function ContactActions({
                       ? normalizeEmail(trimmedEmail)
                       : "",
                   });
+                  if (!result.ok) {
+                    toast.error(result.message);
+                    return;
+                  }
                   toast.success("Contact mis à jour");
                   setEditOpen(false);
                   router.refresh();
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Erreur");
+                } catch {
+                  toast.error("Impossible de mettre à jour ce contact");
                 }
               });
             }}
@@ -256,17 +260,21 @@ export function ContactActions({
               onClick={() =>
                 startTransition(async () => {
                   try {
-                    await setContactArchived({
+                    const result = await setContactArchived({
                       organizationId,
                       orgSlug,
                       contactId: contact.id,
                       archived: !archived,
                     });
+                    if (!result.ok) {
+                      toast.error(result.message);
+                      return;
+                    }
                     toast.success(archived ? "Contact restauré" : "Contact archivé");
                     setArchiveOpen(false);
                     router.refresh();
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Erreur");
+                  } catch {
+                    toast.error("Impossible de modifier ce contact");
                   }
                 })
               }
@@ -293,17 +301,21 @@ export function ContactActions({
               onClick={() =>
                 startTransition(async () => {
                   try {
-                    await deleteContact({
+                    const result = await deleteContact({
                       organizationId,
                       orgSlug,
                       contactId: contact.id,
                     });
+                    if (!result.ok) {
+                      toast.error(result.message);
+                      return;
+                    }
                     toast.success("Contact supprimé");
                     onDeleted?.(contact.id);
                     setDeleteOpen(false);
                     router.refresh();
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Erreur");
+                  } catch {
+                    toast.error("Impossible de supprimer ce contact");
                   }
                 })
               }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePendingOverlay } from "@/components/page-loader";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import {
   cancelCampaign,
   deleteCampaign,
@@ -57,7 +58,7 @@ export function CampaignActions({
                 toast.success("Envoi démarré");
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }
@@ -97,7 +98,7 @@ export function CampaignActions({
                 toast.success("Renvoi démarré");
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }
@@ -121,7 +122,7 @@ export function CampaignActions({
                 toast.success("Relance des échecs");
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }
@@ -154,7 +155,7 @@ export function CampaignActions({
                 router.push(`/o/${orgSlug}/campaigns`);
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { createCampaign, updateCampaign } from "@/lib/campaigns/actions";
 import { usePendingOverlay } from "@/components/page-loader";
 import { composeSmsText, composeTemplateCaption } from "@/lib/campaigns/compose-caption";
@@ -219,16 +220,20 @@ export function CampaignForm({
                 contactIds: listId ? [] : selected,
                 sendNow: channel === "whatsapp" || (channel === "sms" && smsConfigured),
               });
+              if (!campaign.ok) {
+                toast.error(campaign.message);
+                return;
+              }
               toast.success(
                 channel === "sms" && !smsConfigured
                   ? "Campagne SMS enregistrée en brouillon"
                   : "Campagne lancée",
               );
-              router.push(`/o/${orgSlug}/campaigns/${campaign.id}`);
+              router.push(`/o/${orgSlug}/campaigns/${campaign.data.id}`);
             }
             router.refresh();
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Erreur");
+            toastCaughtError(err, "Impossible d'enregistrer cette campagne");
           }
         });
       }}

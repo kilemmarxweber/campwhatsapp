@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { saveSmsSettings } from "@/lib/sms/actions";
 import {
   DEFAULT_INFOBIP_BASE_URL,
@@ -85,7 +86,7 @@ export function InfobipSmsSettingsForm({
               toast.success("Paramètres SMS enregistrés");
               router.refresh();
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Erreur");
+              toastCaughtError(err);
             }
           });
         }}

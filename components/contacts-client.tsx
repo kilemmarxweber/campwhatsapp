@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { DownloadIcon, FolderOpenIcon, SearchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import type { CountryCode } from "libphonenumber-js";
 import {
   createContact,
@@ -155,7 +156,7 @@ export function ContactsClient({
       syncContactsUrl(orgSlug, nextQ, result.page);
     } catch (err) {
       if (seq !== fetchSeq.current) return;
-      toast.error(err instanceof Error ? err.message : "Recherche échouée");
+      toastCaughtError(err, "Recherche échouée");
     } finally {
       if (seq === fetchSeq.current) setTableLoading(false);
     }
@@ -201,7 +202,7 @@ export function ContactsClient({
           );
           router.refresh();
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Import échoué");
+          toastCaughtError(err, "Import échoué");
         } finally {
           input.value = "";
           setImportFileName(null);
@@ -233,7 +234,7 @@ export function ContactsClient({
             }
             startTransition(async () => {
               try {
-                await createContact({
+                const result = await createContact({
                   organizationId,
                   orgSlug,
                   phone: checked.e164,
@@ -242,13 +243,17 @@ export function ContactsClient({
                     ? normalizeEmail(trimmedEmail)
                     : undefined,
                 });
+                if (!result.ok) {
+                  toast.error(result.message);
+                  return;
+                }
                 toast.success("Contact ajouté");
                 setPhoneValue({ country: phoneValue.country, national: "" });
                 setName("");
                 setEmail("");
                 router.refresh();
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+              } catch {
+                toast.error("Impossible d'ajouter ce contact");
               }
             });
           }}
@@ -358,18 +363,22 @@ export function ContactsClient({
               }
               startTransition(async () => {
                 try {
-                  await createContactList({
+                  const result = await createContactList({
                     organizationId,
                     orgSlug,
                     name: listName,
                     contactIds: selected,
                   });
+                  if (!result.ok) {
+                    toast.error(result.message);
+                    return;
+                  }
                   toast.success("Groupe créé");
                   setListName("");
                   setSelected([]);
                   router.refresh();
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Erreur");
+                } catch {
+                  toast.error("Impossible de créer ce groupe");
                 }
               });
             }}
@@ -491,9 +500,7 @@ export function ContactsClient({
                         : "Export téléchargé",
                     );
                   } catch (err) {
-                    toast.error(
-                      err instanceof Error ? err.message : "Export échoué",
-                    );
+                    toastCaughtError(err, "Export échoué");
                   }
                 });
               }}

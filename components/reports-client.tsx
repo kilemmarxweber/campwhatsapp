@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DownloadIcon, FileSpreadsheetIcon, FileTextIcon } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { Button } from "@/components/ui/button";
 import { OverviewMessageCharts } from "@/components/overview-message-charts";
 import { usePendingOverlay } from "@/components/page-loader";
@@ -121,7 +122,7 @@ export function ReportsClient({
         );
         toast.success(format === "pdf" ? "PDF téléchargé" : "Excel téléchargé");
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Export échoué");
+        toastCaughtError(err, "Export échoué");
       }
     });
   }

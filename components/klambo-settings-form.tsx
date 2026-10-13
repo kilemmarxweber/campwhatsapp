@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePendingOverlay } from "@/components/page-loader";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { saveKlamboSettings } from "@/lib/klambo/actions";
 
 export function KlamboSettingsForm({
@@ -98,7 +99,7 @@ export function KlamboSettingsForm({
               toast.success("Paramètres enregistrés");
               router.refresh();
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Erreur");
+              toastCaughtError(err);
             }
           });
         }}

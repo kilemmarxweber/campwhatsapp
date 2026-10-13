@@ -61,15 +61,19 @@ export function MediaLibrary({
               onConfirm={() =>
                 startTransition(async () => {
                   try {
-                    await deleteMediaAsset({
+                    const result = await deleteMediaAsset({
                       organizationId,
                       orgSlug,
                       mediaId: a.id,
                     });
+                    if (!result.ok) {
+                      toast.error(result.message);
+                      return;
+                    }
                     toast.success("Média supprimé");
                     router.refresh();
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Erreur");
+                  } catch {
+                    toast.error("Impossible de supprimer ce média");
                   }
                 })
               }

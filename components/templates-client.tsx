@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePendingOverlay } from "@/components/page-loader";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import {
   createTemplate,
   deleteTemplate,
@@ -260,7 +261,7 @@ export function TemplatesClient({
               resetForm();
               router.refresh();
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Erreur");
+              toastCaughtError(err);
             }
           });
         }}
@@ -697,9 +698,7 @@ export function TemplatesClient({
                           toast.success("Template supprimé");
                           router.refresh();
                         } catch (err) {
-                          toast.error(
-                            err instanceof Error ? err.message : "Erreur",
-                          );
+                          toastCaughtError(err);
                         }
                       })
                     }

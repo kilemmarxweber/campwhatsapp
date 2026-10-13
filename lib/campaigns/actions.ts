@@ -15,6 +15,13 @@ import {
   assertWhatsappTemplateName,
 } from "@/lib/whatsapp/validate";
 import fs from "fs/promises";
+import {
+  actionFail,
+  actionOk,
+  prismaActionMessage,
+  type ActionResult,
+} from "@/lib/action-result";
+import { validateMediaUpload } from "@/lib/media/validate";
 
 function infobipTemplateFields(input: {
   channel: "whatsapp" | "sms";
@@ -136,72 +143,79 @@ export async function createCampaign(input: {
   contactListId?: string | null;
   contactIds?: string[];
   sendNow?: boolean;
-}) {
-  await requireOrganizationPermission(input.organizationId, {
-    campaigns: ["create"],
-  });
-
-  const content = await resolveCampaignContent({
-    organizationId: input.organizationId,
-    templateId: input.templateId,
-    note: input.note,
-    channel: input.channel,
-  });
-
-  const contacts = await resolveCampaignAudience({
-    organizationId: input.organizationId,
-    contactListId: input.contactListId,
-    contactIds: input.contactIds,
-  });
-
-  const campaign = await prisma.campaign.create({
-    data: {
-      organizationId: input.organizationId,
-      name: input.name.trim(),
-      bodyTemplate: content.bodyTemplate,
-      messageType: content.messageType,
-      channel: content.channel,
-      mediaId: content.mediaId || null,
-      whatsappTemplateName: content.whatsappTemplateName,
-      whatsappLanguage: content.whatsappLanguage,
-      contactListId: input.contactListId || null,
-      status: "draft",
-      recipients: {
-        create: contacts.map((c) => ({
-          contactId: c.id,
-          renderedBody: renderTemplate(content.bodyTemplate, {
-            name: c.name ?? "",
-            phone: c.phone,
-            email: c.email ?? "",
-            ...((c.variables as Record<string, string>) ?? {}),
-          }),
-          status: "pending",
-        })),
-      },
-    },
-  });
-
-  if (input.sendNow) {
+}): Promise<ActionResult<{ id: string }>> {
+  try {
     await requireOrganizationPermission(input.organizationId, {
-      campaigns: ["send"],
+      campaigns: ["create"],
     });
-    if (
-      content.channel === "sms" &&
-      !(await isSmsConfiguredForBranch(input.organizationId))
-    ) {
-      throw new Error(
-        "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip. La campagne reste en brouillon.",
-      );
-    }
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: "sending" },
-    });
-    enqueueCampaign(campaign.id);
-  }
 
-  revalidatePath(`/o/${input.orgSlug}/campaigns`);
-  return campaign;
+    const content = await resolveCampaignContent({
+      organizationId: input.organizationId,
+      templateId: input.templateId,
+      note: input.note,
+      channel: input.channel,
+    });
+
+    const contacts = await resolveCampaignAudience({
+      organizationId: input.organizationId,
+      contactListId: input.contactListId,
+      contactIds: input.contactIds,
+    });
+
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId: input.organizationId,
+        name: input.name.trim(),
+        bodyTemplate: content.bodyTemplate,
+        messageType: content.messageType,
+        channel: content.channel,
+        mediaId: content.mediaId || null,
+        whatsappTemplateName: content.whatsappTemplateName,
+        whatsappLanguage: content.whatsappLanguage,
+        contactListId: input.contactListId || null,
+        status: "draft",
+        recipients: {
+          create: contacts.map((c) => ({
+            contactId: c.id,
+            renderedBody: renderTemplate(content.bodyTemplate, {
+              name: c.name ?? "",
+              phone: c.phone,
+              email: c.email ?? "",
+              ...((c.variables as Record<string, string>) ?? {}),
+            }),
+            status: "pending",
+          })),
+        },
+      },
+    });
+
+    if (input.sendNow) {
+      await requireOrganizationPermission(input.organizationId, {
+        campaigns: ["send"],
+      });
+      if (
+        content.channel === "sms" &&
+        !(await isSmsConfiguredForBranch(input.organizationId))
+      ) {
+        revalidatePath(`/o/${input.orgSlug}/campaigns`);
+        return actionFail(
+          "L'envoi SMS n'est pas configuré pour cette organisation. Enregistrez sa clé Infobip. La campagne reste en brouillon.",
+        );
+      }
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: "sending" },
+      });
+      enqueueCampaign(campaign.id);
+    }
+
+    revalidatePath(`/o/${input.orgSlug}/campaigns`);
+    return actionOk({ id: campaign.id });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible de créer cette campagne"),
+    );
+  }
 }
 
 export async function startCampaign(input: {
@@ -475,41 +489,20 @@ export async function uploadMediaAsset(input: {
   filename: string;
   mimeType: string;
   base64: string;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     media: ["create"],
   });
 
   const buf = Buffer.from(input.base64, "base64");
   const size = buf.byteLength;
-  const isImage = input.mimeType.startsWith("image/");
-  const isVideo = input.mimeType.startsWith("video/");
+  const checked = validateMediaUpload({
+    mimeType: input.mimeType,
+    size,
+    filename: input.filename,
+  });
+  if (!checked.ok) return actionFail(checked.message);
 
-  if (!isImage && !isVideo) {
-    throw new Error("Seules les images et vidéos sont acceptées");
-  }
-  const allowedImage = ["image/jpeg", "image/png"];
-  const allowedVideo = ["video/mp4", "video/3gpp"];
-  if (isImage && !allowedImage.includes(input.mimeType)) {
-    throw new Error("Image : JPEG ou PNG uniquement (limite Klambo/WhatsApp)");
-  }
-  if (isVideo && !allowedVideo.includes(input.mimeType)) {
-    throw new Error("Vidéo : MP4 ou 3GPP uniquement (limite Klambo/WhatsApp)");
-  }
-  if (isImage && size < 2_000) {
-    throw new Error("Image trop petite — utilisez une vraie photo");
-  }
-  if (isVideo && size < 10_000) {
-    throw new Error("Vidéo trop petite — utilisez un vrai fichier MP4");
-  }
-  if (isImage && size > 5 * 1024 * 1024) {
-    throw new Error("Image max 5 Mo (limite Klambo)");
-  }
-  if (isVideo && size > 30 * 1024 * 1024) {
-    throw new Error("Vidéo max 30 Mo");
-  }
-
-  const kind = isImage ? "image" : "video";
   const { relativePath } = await writeOrgUpload({
     organizationId: input.organizationId,
     filename: input.filename,
@@ -522,7 +515,7 @@ export async function uploadMediaAsset(input: {
     try {
       const registered = await client.registerMedia({
         relative_path: relativePath.replace(/\\/g, "/"),
-        mime_type: input.mimeType,
+        mime_type: checked.mimeType,
         filename: input.filename,
       });
       klamboMediaId = registered.id;
@@ -530,7 +523,7 @@ export async function uploadMediaAsset(input: {
       const uploaded = await client.uploadMedia(
         buf,
         input.filename,
-        input.mimeType,
+        checked.mimeType,
       );
       klamboMediaId = uploaded.id;
     }
@@ -541,27 +534,33 @@ export async function uploadMediaAsset(input: {
     );
   }
 
-  const asset = await prisma.mediaAsset.create({
-    data: {
-      organizationId: input.organizationId,
-      filename: input.filename,
-      mimeType: input.mimeType,
-      size,
-      kind,
-      storagePath: relativePath,
-      klamboMediaId,
-    },
-  });
+  try {
+    await prisma.mediaAsset.create({
+      data: {
+        organizationId: input.organizationId,
+        filename: input.filename,
+        mimeType: checked.mimeType,
+        size,
+        kind: checked.kind,
+        storagePath: relativePath,
+        klamboMediaId,
+      },
+    });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible d'enregistrer ce média"),
+    );
+  }
 
   revalidatePath(`/o/${input.orgSlug}/media`);
-  return asset;
+  return actionOk();
 }
 
 export async function deleteMediaAsset(input: {
   organizationId: string;
   orgSlug: string;
   mediaId: string;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     media: ["delete"],
   });
@@ -572,7 +571,7 @@ export async function deleteMediaAsset(input: {
       organizationId: input.organizationId,
     },
   });
-  if (!asset) throw new Error("Média introuvable");
+  if (!asset) return actionFail("Média introuvable");
 
   const sending = await prisma.campaign.count({
     where: {
@@ -582,12 +581,18 @@ export async function deleteMediaAsset(input: {
     },
   });
   if (sending > 0) {
-    throw new Error(
-      "Ce média est utilisé par une campagne en cours d'envoi — annulez-la d'abord",
+    return actionFail(
+      "Ce média est utilisé par une campagne en cours d'envoi. Annulez-la d'abord.",
     );
   }
 
-  await prisma.mediaAsset.delete({ where: { id: asset.id } });
+  try {
+    await prisma.mediaAsset.delete({ where: { id: asset.id } });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible de supprimer ce média"),
+    );
+  }
 
   try {
     const absolute = await resolveUploadAbsolutePath(asset.storagePath);
@@ -599,6 +604,7 @@ export async function deleteMediaAsset(input: {
   revalidatePath(`/o/${input.orgSlug}/media`);
   revalidatePath(`/o/${input.orgSlug}/templates`);
   revalidatePath(`/o/${input.orgSlug}/campaigns/new`);
+  return actionOk();
 }
 
 export async function createTemplate(input: {

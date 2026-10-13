@@ -93,15 +93,19 @@ export function ContactGroupRow({
           listId: list.id,
           contactIds,
         });
+        if (!result.ok) {
+          toast.error(result.message);
+          return;
+        }
         toast.success(
-          result.removed === 1
+          result.data.removed === 1
             ? "1 contact retiré"
-            : `${result.removed} contacts retirés`,
+            : `${result.data.removed} contacts retirés`,
         );
         setPicked((prev) => prev.filter((id) => !contactIds.includes(id)));
         onChanged();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Erreur");
+      } catch {
+        toast.error("Impossible de retirer ces contacts");
       }
     });
   }
@@ -260,16 +264,18 @@ export function ContactGroupRow({
                         listId: list.id,
                         contactIds,
                       });
+                      if (!result.ok) {
+                        toast.error(result.message);
+                        return;
+                      }
                       toast.success(
-                        result.added === 1
+                        result.data.added === 1
                           ? "1 contact ajouté"
-                          : `${result.added} contacts ajoutés`,
+                          : `${result.data.added} contacts ajoutés`,
                       );
                       onChanged();
-                    } catch (err) {
-                      toast.error(
-                        err instanceof Error ? err.message : "Erreur",
-                      );
+                    } catch {
+                      toast.error("Impossible d'ajouter ces contacts");
                     }
                   });
                 }}
@@ -299,15 +305,19 @@ export function ContactGroupRow({
           onConfirm={() =>
             startTransition(async () => {
               try {
-                await deleteContactList({
+                const result = await deleteContactList({
                   organizationId,
                   orgSlug,
                   listId: list.id,
                 });
+                if (!result.ok) {
+                  toast.error(result.message);
+                  return;
+                }
                 toast.success("Groupe supprimé");
                 onChanged();
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+              } catch {
+                toast.error("Impossible de supprimer ce groupe");
               }
             })
           }

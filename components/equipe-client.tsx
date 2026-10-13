@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EllipsisIcon, KeyRoundIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { isOwnerOrgRole } from "@/lib/permissions";
 import {
   createSuccursaleMember,
@@ -111,19 +112,23 @@ export function EquipeClient({
                   event.preventDefault();
                   startTransition(async () => {
                     try {
-                      await createSuccursaleMember({
+                      const result = await createSuccursaleMember({
                         organizationId,
                         orgSlug,
                         name,
                         email,
                         role,
                       });
+                      if (!result.ok) {
+                        toast.error(result.message);
+                        return;
+                      }
                       toast.success("Membre créé. Email envoyé.");
                       reset();
                       setOpen(false);
                       router.refresh();
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Erreur");
+                    } catch {
+                      toast.error("Impossible d'ajouter ce membre");
                     }
                   });
                 }}
@@ -359,7 +364,7 @@ function MemberActions({
                   setEditOpen(false);
                   router.refresh();
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Erreur");
+                  toastCaughtError(err);
                 }
               });
             }}
@@ -414,7 +419,7 @@ function MemberActions({
                     });
                     toast.success("Email de réinitialisation envoyé");
                   } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Erreur");
+                    toastCaughtError(err);
                   }
                 });
               }}
@@ -450,7 +455,7 @@ function MemberActions({
                     toast.success("Membre supprimé");
                     router.refresh();
                   } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Erreur");
+                    toastCaughtError(err);
                   }
                 });
               }}

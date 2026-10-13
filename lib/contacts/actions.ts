@@ -14,6 +14,13 @@ import {
 } from "@/lib/input-security";
 import { parseContactsExcel } from "@/lib/contacts/import-excel";
 import { buildContactsWorkbook } from "@/lib/contacts/export-excel";
+import {
+  actionFail,
+  actionOk,
+  prismaActionMessage,
+  type ActionResult,
+} from "@/lib/action-result";
+
 export type ContactRow = {
   id: string;
   phone: string;
@@ -83,7 +90,7 @@ export async function createContact(input: {
   name?: string;
   email?: string;
   variables?: Record<string, string>;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["create"],
   });
@@ -92,27 +99,46 @@ export async function createContact(input: {
     input.phone,
     (await getDefaultCountryForBranch(input.organizationId)) as CountryCode,
   );
-  if (!phone) throw new Error("Numéro de téléphone invalide");
+  if (!phone) return actionFail("Numéro de téléphone invalide");
 
   const name = filterPersonName(input.name ?? "") || null;
   const emailRaw = (input.email ?? "").trim();
   const email = emailRaw ? normalizeEmail(emailRaw) : null;
   if (email && !isValidEmail(email)) {
-    throw new Error("Email invalide");
+    return actionFail("Email invalide");
   }
 
-  const contact = await prisma.contact.create({
-    data: {
-      organizationId: input.organizationId,
-      phone,
-      name,
-      email,
-      variables: input.variables ?? {},
+  const existing = await prisma.contact.findUnique({
+    where: {
+      organizationId_phone: {
+        organizationId: input.organizationId,
+        phone,
+      },
     },
+    select: { id: true },
   });
+  if (existing) {
+    return actionFail("Ce contact existe déjà (même numéro).");
+  }
+
+  try {
+    await prisma.contact.create({
+      data: {
+        organizationId: input.organizationId,
+        phone,
+        name,
+        email,
+        variables: input.variables ?? {},
+      },
+    });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible d'ajouter ce contact"),
+    );
+  }
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return contact;
+  return actionOk();
 }
 
 export async function updateContact(input: {
@@ -122,7 +148,7 @@ export async function updateContact(input: {
   phone: string;
   name?: string;
   email?: string;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["update"],
   });
@@ -130,13 +156,13 @@ export async function updateContact(input: {
     where: { id: input.contactId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!existing) throw new Error("Contact introuvable");
+  if (!existing) return actionFail("Contact introuvable");
 
   const phone = normalizePhone(
     input.phone,
     (await getDefaultCountryForBranch(input.organizationId)) as CountryCode,
   );
-  if (!phone) throw new Error("Numéro de téléphone invalide");
+  if (!phone) return actionFail("Numéro de téléphone invalide");
 
   const clash = await prisma.contact.findFirst({
     where: {
@@ -146,25 +172,31 @@ export async function updateContact(input: {
     },
     select: { id: true },
   });
-  if (clash) throw new Error("Ce numéro existe déjà");
+  if (clash) return actionFail("Ce contact existe déjà (même numéro).");
 
   const name = filterPersonName(input.name ?? "") || null;
   const emailRaw = (input.email ?? "").trim();
   const email = emailRaw ? normalizeEmail(emailRaw) : null;
   if (email && !isValidEmail(email)) {
-    throw new Error("Email invalide");
+    return actionFail("Email invalide");
   }
 
-  await prisma.contact.update({
-    where: { id: existing.id },
-    data: {
-      phone,
-      name,
-      email,
-    },
-  });
+  try {
+    await prisma.contact.update({
+      where: { id: existing.id },
+      data: {
+        phone,
+        name,
+        email,
+      },
+    });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible de mettre à jour ce contact"),
+    );
+  }
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { ok: true as const };
+  return actionOk();
 }
 
 export async function setContactArchived(input: {
@@ -172,7 +204,7 @@ export async function setContactArchived(input: {
   orgSlug: string;
   contactId: string;
   archived: boolean;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["update"],
   });
@@ -180,20 +212,20 @@ export async function setContactArchived(input: {
     where: { id: input.contactId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!contact) throw new Error("Contact introuvable");
+  if (!contact) return actionFail("Contact introuvable");
   await prisma.contact.update({
     where: { id: contact.id },
     data: { archivedAt: input.archived ? new Date() : null },
   });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { ok: true as const };
+  return actionOk();
 }
 
 export async function deleteContact(input: {
   organizationId: string;
   orgSlug: string;
   contactId: string;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["delete"],
   });
@@ -201,12 +233,18 @@ export async function deleteContact(input: {
     where: { id: input.contactId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!contact) throw new Error("Contact introuvable");
-  await prisma.contact.delete({
-    where: { id: contact.id },
-  });
+  if (!contact) return actionFail("Contact introuvable");
+  try {
+    await prisma.contact.delete({
+      where: { id: contact.id },
+    });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible de supprimer ce contact"),
+    );
+  }
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { ok: true as const };
+  return actionOk();
 }
 
 export async function importContactsFromExcel(input: {
@@ -332,7 +370,7 @@ export async function createContactList(input: {
   orgSlug: string;
   name: string;
   contactIds: string[];
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["create"],
   });
@@ -349,31 +387,39 @@ export async function createContactList(input: {
       })
     : [];
   if (contacts.length === 0) {
-    throw new Error("Sélectionnez au moins un contact actif");
+    return actionFail("Sélectionnez au moins un contact actif");
   }
   if (contacts.length !== uniqueIds.length) {
-    throw new Error("Un ou plusieurs contacts sont introuvables ou archivés");
+    return actionFail(
+      "Un ou plusieurs contacts sont introuvables ou archivés",
+    );
   }
 
-  const list = await prisma.contactList.create({
-    data: {
-      organizationId: input.organizationId,
-      name: input.name.trim(),
-      members: {
-        create: contacts.map((contact) => ({ contactId: contact.id })),
+  try {
+    await prisma.contactList.create({
+      data: {
+        organizationId: input.organizationId,
+        name: input.name.trim(),
+        members: {
+          create: contacts.map((contact) => ({ contactId: contact.id })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    return actionFail(
+      prismaActionMessage(err, "Impossible de créer ce groupe"),
+    );
+  }
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return list;
+  return actionOk();
 }
 
 export async function deleteContactList(input: {
   organizationId: string;
   orgSlug: string;
   listId: string;
-}) {
+}): Promise<ActionResult> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["delete"],
   });
@@ -381,9 +427,10 @@ export async function deleteContactList(input: {
     where: { id: input.listId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!list) throw new Error("Groupe introuvable");
+  if (!list) return actionFail("Groupe introuvable");
   await prisma.contactList.delete({ where: { id: list.id } });
   revalidatePath(`/o/${input.orgSlug}/contacts`);
+  return actionOk();
 }
 
 export async function addContactsToList(input: {
@@ -391,7 +438,7 @@ export async function addContactsToList(input: {
   orgSlug: string;
   listId: string;
   contactIds: string[];
-}) {
+}): Promise<ActionResult<{ added: number }>> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["update"],
   });
@@ -400,11 +447,11 @@ export async function addContactsToList(input: {
     where: { id: input.listId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!list) throw new Error("Groupe introuvable");
+  if (!list) return actionFail("Groupe introuvable");
 
   const uniqueIds = [...new Set(input.contactIds)];
   if (uniqueIds.length === 0) {
-    throw new Error("Sélectionnez au moins un contact");
+    return actionFail("Sélectionnez au moins un contact");
   }
 
   const contacts = await prisma.contact.findMany({
@@ -416,7 +463,7 @@ export async function addContactsToList(input: {
     select: { id: true },
   });
   if (contacts.length === 0) {
-    throw new Error("Aucun contact actif à ajouter");
+    return actionFail("Aucun contact actif à ajouter");
   }
 
   await prisma.contactListMember.createMany({
@@ -428,7 +475,7 @@ export async function addContactsToList(input: {
   });
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { added: contacts.length };
+  return actionOk({ added: contacts.length });
 }
 
 export async function removeContactFromList(input: {
@@ -436,14 +483,18 @@ export async function removeContactFromList(input: {
   orgSlug: string;
   listId: string;
   contactId: string;
-}) {
+}): Promise<ActionResult> {
   const result = await removeContactsFromList({
     organizationId: input.organizationId,
     orgSlug: input.orgSlug,
     listId: input.listId,
     contactIds: [input.contactId],
   });
-  if (result.removed === 0) throw new Error("Contact absent de ce groupe");
+  if (!result.ok) return result;
+  if (result.data.removed === 0) {
+    return actionFail("Contact absent de ce groupe");
+  }
+  return actionOk();
 }
 
 export async function removeContactsFromList(input: {
@@ -451,7 +502,7 @@ export async function removeContactsFromList(input: {
   orgSlug: string;
   listId: string;
   contactIds: string[];
-}) {
+}): Promise<ActionResult<{ removed: number }>> {
   await requireOrganizationPermission(input.organizationId, {
     contacts: ["update"],
   });
@@ -460,11 +511,11 @@ export async function removeContactsFromList(input: {
     where: { id: input.listId, organizationId: input.organizationId },
     select: { id: true },
   });
-  if (!list) throw new Error("Groupe introuvable");
+  if (!list) return actionFail("Groupe introuvable");
 
   const uniqueIds = [...new Set(input.contactIds)];
   if (uniqueIds.length === 0) {
-    throw new Error("Sélectionnez au moins un contact");
+    return actionFail("Sélectionnez au moins un contact");
   }
 
   const result = await prisma.contactListMember.deleteMany({
@@ -475,6 +526,6 @@ export async function removeContactsFromList(input: {
   });
 
   revalidatePath(`/o/${input.orgSlug}/contacts`);
-  return { removed: result.count };
+  return actionOk({ removed: result.count });
 }
 

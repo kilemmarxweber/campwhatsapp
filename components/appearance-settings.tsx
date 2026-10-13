@@ -5,6 +5,7 @@ import { usePendingOverlay } from "@/components/page-loader";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { KlamboSettingsForm } from "@/components/klambo-settings-form";
 import { WhatsappProviderSettings } from "@/components/infobip-whatsapp-settings";
 import type { WhatsappProvider } from "@/lib/whatsapp/config";
@@ -168,7 +169,7 @@ export function SettingsView({
               toast.success(copy.settings.saved);
               router.refresh();
             } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Erreur");
+              toastCaughtError(error);
             }
           });
         }}

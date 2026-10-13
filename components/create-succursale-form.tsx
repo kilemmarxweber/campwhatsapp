@@ -59,17 +59,21 @@ export function AddSuccursaleButton({ tenantId }: { tenantId: string }) {
             event.preventDefault();
             startTransition(async () => {
               try {
-                await createSuccursale({
+                const result = await createSuccursale({
                   name,
                   slug: slug || slugify(name),
                   tenantId,
                 });
+                if (!result.ok) {
+                  toast.error(result.message);
+                  return;
+                }
                 toast.success("Succursale créée");
                 reset();
                 setOpen(false);
                 router.refresh();
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+              } catch {
+                toast.error("Impossible de créer cette succursale");
               }
             });
           }}

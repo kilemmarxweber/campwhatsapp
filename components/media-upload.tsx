@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FolderOpenIcon } from "lucide-react";
 import { toast } from "sonner";
 import { uploadMediaAsset } from "@/lib/campaigns/actions";
+import { validateMediaUpload } from "@/lib/media/validate";
 import { usePendingOverlay } from "@/components/page-loader";
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -29,6 +30,18 @@ export function MediaUpload({
   const [fileName, setFileName] = useState<string | null>(null);
 
   function handleFile(file: File, input: HTMLInputElement) {
+    const checked = validateMediaUpload({
+      mimeType: file.type,
+      size: file.size,
+      filename: file.name,
+    });
+    if (!checked.ok) {
+      toast.error(checked.message);
+      input.value = "";
+      setFileName(null);
+      return;
+    }
+
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
@@ -36,17 +49,21 @@ export function MediaUpload({
       if (!(result instanceof ArrayBuffer)) return;
       startTransition(async () => {
         try {
-          await uploadMediaAsset({
+          const upload = await uploadMediaAsset({
             organizationId,
             orgSlug,
             filename: file.name,
-            mimeType: file.type || "application/octet-stream",
+            mimeType: checked.mimeType,
             base64: arrayBufferToBase64(result),
           });
+          if (!upload.ok) {
+            toast.error(upload.message);
+            return;
+          }
           toast.success("Média ajouté");
           router.refresh();
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Erreur");
+        } catch {
+          toast.error("Impossible d'envoyer ce média");
         } finally {
           input.value = "";
           setFileName(null);

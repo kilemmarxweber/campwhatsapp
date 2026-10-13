@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { usePendingOverlay } from "@/components/page-loader";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { toastCaughtError } from "@/lib/toast-action";
 import { deleteCampaign, resendCampaign } from "@/lib/campaigns/actions";
 import { ConfirmAlertDialogButton } from "@/components/confirm-alert-dialog";
 
@@ -48,7 +49,7 @@ export function CampaignRowActions({
                 router.push(`/o/${orgSlug}/campaigns/${campaignId}`);
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }
@@ -86,7 +87,7 @@ export function CampaignRowActions({
                 toast.success("Campagne supprimée");
                 router.refresh();
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Erreur");
+                toastCaughtError(err);
               }
             })
           }

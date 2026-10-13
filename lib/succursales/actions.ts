@@ -98,25 +98,41 @@ export async function createSuccursale(input: {
   tenantSlug?: string;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non authentifié");
+  if (!session?.user) {
+    return { ok: false as const, message: "Non authentifié" };
+  }
   const access = await getGovernanceContext(session.user.id, session.user.role);
   if (!access) {
-    throw new Error("Seuls le propriétaire et l'administrateur peuvent créer une succursale");
+    return {
+      ok: false as const,
+      message:
+        "Seuls le propriétaire et l'administrateur peuvent créer une succursale",
+    };
   }
 
   const name = input.name.trim();
   const slug = input.slug.trim().toLowerCase();
-  if (!name || !slug) throw new Error("Nom et slug requis");
+  if (!name || !slug) {
+    return { ok: false as const, message: "Nom et slug requis" };
+  }
   const slugTaken = await prisma.organization.findUnique({ where: { slug } });
-  if (slugTaken) throw new Error("Ce slug de succursale existe déjà");
+  if (slugTaken) {
+    return { ok: false as const, message: "Ce slug de succursale existe déjà" };
+  }
 
   const tenantName = input.tenantName?.trim() ?? "";
   const tenantSlug = input.tenantSlug?.trim().toLowerCase() ?? "";
   if (!input.tenantId && !canCreateOrganization(access.level)) {
-    throw new Error("Seul le propriétaire peut créer une organisation");
+    return {
+      ok: false as const,
+      message: "Seul le propriétaire peut créer une organisation",
+    };
   }
   if (!input.tenantId && (!tenantName || !tenantSlug)) {
-    throw new Error("Nom et slug de l'organisation requis");
+    return {
+      ok: false as const,
+      message: "Nom et slug de l'organisation requis",
+    };
   }
   if (
     input.tenantId &&
@@ -126,48 +142,81 @@ export async function createSuccursale(input: {
       ownTenantIds: access.tenantIds,
     })
   ) {
-    throw new Error("Vous ne pouvez créer une succursale que dans votre organisation");
-  }
-  const tenant = input.tenantId
-    ? await prisma.tenantOrganization.findUnique({ where: { id: input.tenantId } })
-    : await prisma.tenantOrganization.create({ data: { name: tenantName, slug: tenantSlug } });
-  if (!tenant) throw new Error("Organisation introuvable");
-  if (tenant.archivedAt) {
-    throw new Error("Cette organisation est archivée. Restaurez-la avant d'ajouter une succursale.");
+    return {
+      ok: false as const,
+      message:
+        "Vous ne pouvez créer une succursale que dans votre organisation",
+    };
   }
 
-  const created = await auth.api.createOrganization({
-    headers: await headers(),
-    body: { name, slug, tenantId: tenant.id },
-  });
+  try {
+    const tenant = input.tenantId
+      ? await prisma.tenantOrganization.findUnique({
+          where: { id: input.tenantId },
+        })
+      : await prisma.tenantOrganization.create({
+          data: { name: tenantName, slug: tenantSlug },
+        });
+    if (!tenant) {
+      return { ok: false as const, message: "Organisation introuvable" };
+    }
+    if (tenant.archivedAt) {
+      return {
+        ok: false as const,
+        message:
+          "Cette organisation est archivée. Restaurez-la avant d'ajouter une succursale.",
+      };
+    }
 
-  if (!created) throw new Error("Création impossible");
-
-  await prisma.organization.update({
-    where: { id: created.id },
-    data: { tenantId: tenant.id },
-  });
-  if (access.level === "admin") {
-    await prisma.member.updateMany({
-      where: { organizationId: created.id, userId: session.user.id },
-      data: { role: ORG_ROLE.ADMIN },
+    const created = await auth.api.createOrganization({
+      headers: await headers(),
+      body: { name, slug, tenantId: tenant.id },
     });
-    await prisma.tenantMember.upsert({
-      where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-      create: { tenantId: tenant.id, userId: session.user.id, role: TENANT_ROLE.ADMIN },
-      update: { role: TENANT_ROLE.ADMIN },
+
+    if (!created) {
+      return { ok: false as const, message: "Création impossible" };
+    }
+
+    await prisma.organization.update({
+      where: { id: created.id },
+      data: { tenantId: tenant.id },
     });
-  } else {
-    await ensureTenantOwner(created.id);
+    if (access.level === "admin") {
+      await prisma.member.updateMany({
+        where: { organizationId: created.id, userId: session.user.id },
+        data: { role: ORG_ROLE.ADMIN },
+      });
+      await prisma.tenantMember.upsert({
+        where: {
+          tenantId_userId: { tenantId: tenant.id, userId: session.user.id },
+        },
+        create: {
+          tenantId: tenant.id,
+          userId: session.user.id,
+          role: TENANT_ROLE.ADMIN,
+        },
+        update: { role: TENANT_ROLE.ADMIN },
+      });
+    } else {
+      await ensureTenantOwner(created.id);
+    }
+
+    await seedSystemGlobalRoles();
+    await syncAllGlobalRolesToOrg(created.id);
+
+    revalidatePath("/dashboard");
+    revalidatePath("/organisations");
+    revalidatePath("/admin/succursales");
+    return { ok: true as const, data: created };
+  } catch (err) {
+    const message =
+      err instanceof Error &&
+      err.message &&
+      !/minified react error|#\d+|digest/i.test(err.message)
+        ? err.message
+        : "Impossible de créer cette succursale";
+    return { ok: false as const, message };
   }
-
-  await seedSystemGlobalRoles();
-  await syncAllGlobalRolesToOrg(created.id);
-
-  revalidatePath("/dashboard");
-  revalidatePath("/organisations");
-  revalidatePath("/admin/succursales");
-  return created;
 }
 
 async function ensureTenantOwner(branchId: string) {
@@ -207,14 +256,26 @@ export async function createSuccursaleMember(input: {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
   const role = input.role.trim();
-  if (!email || !name || !role) throw new Error("Nom, email et rôle requis");
-  assertAssignableRole(role);
+  if (!email || !name || !role) {
+    return { ok: false as const, message: "Nom, email et rôle requis" };
+  }
+  try {
+    assertAssignableRole(role);
+  } catch (err) {
+    return {
+      ok: false as const,
+      message:
+        err instanceof Error ? err.message : "Rôle non autorisé",
+    };
+  }
 
   const branch = await prisma.organization.findUnique({
     where: { id: input.organizationId },
     select: { id: true, name: true, tenant: { select: { name: true } } },
   });
-  if (!branch) throw new Error("Succursale introuvable");
+  if (!branch) {
+    return { ok: false as const, message: "Succursale introuvable" };
+  }
 
   const roleRow = await prisma.globalRole.findUnique({
     where: { slug: role },
@@ -228,39 +289,59 @@ export async function createSuccursaleMember(input: {
 
   let userId: string;
   let temporaryPassword: string | undefined;
-  if (existing) {
-    const already = await prisma.member.findFirst({
-      where: { userId: existing.id, organizationId: branch.id },
-      select: { id: true },
-    });
-    if (already) throw new Error("Ce membre fait déjà partie de la succursale");
-    userId = existing.id;
-  } else {
-    temporaryPassword = generateSecurePassword(16);
-    const created = await auth.api.createUser({
+  try {
+    if (existing) {
+      const already = await prisma.member.findFirst({
+        where: { userId: existing.id, organizationId: branch.id },
+        select: { id: true },
+      });
+      if (already) {
+        return {
+          ok: false as const,
+          message: "Ce membre fait déjà partie de la succursale",
+        };
+      }
+      userId = existing.id;
+    } else {
+      temporaryPassword = generateSecurePassword(16);
+      const created = await auth.api.createUser({
+        body: {
+          email,
+          name,
+          password: temporaryPassword,
+          role: APP_ROLE.USER,
+        },
+      });
+      if (!created?.user?.id) {
+        return {
+          ok: false as const,
+          message: "Création du compte impossible",
+        };
+      }
+      userId = created.user.id;
+      await prisma.user.update({
+        where: { id: userId },
+        data: { emailVerified: true, mustChangePassword: true },
+      });
+    }
+
+    await auth.api.addMember({
+      headers: await headers(),
       body: {
-        email,
-        name,
-        password: temporaryPassword,
-        role: APP_ROLE.USER,
+        userId,
+        role: role as "owner",
+        organizationId: branch.id,
       },
     });
-    if (!created?.user?.id) throw new Error("Création du compte impossible");
-    userId = created.user.id;
-    await prisma.user.update({
-      where: { id: userId },
-      data: { emailVerified: true, mustChangePassword: true },
-    });
+  } catch (err) {
+    const message =
+      err instanceof Error &&
+      err.message &&
+      !/minified react error|#\d+|digest/i.test(err.message)
+        ? err.message
+        : "Impossible d'ajouter ce membre";
+    return { ok: false as const, message };
   }
-
-  await auth.api.addMember({
-    headers: await headers(),
-    body: {
-      userId,
-      role: role as "owner",
-      organizationId: branch.id,
-    },
-  });
 
   try {
     await sendMemberCreatedEmail({
@@ -273,10 +354,15 @@ export async function createSuccursaleMember(input: {
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "envoi impossible";
-    throw new Error(`Membre créé, mais l'email n'a pas été envoyé (${detail})`);
+    revalidatePath(`/o/${input.orgSlug}/equipe`);
+    return {
+      ok: false as const,
+      message: `Membre créé, mais l'email n'a pas été envoyé (${detail})`,
+    };
   }
 
   revalidatePath(`/o/${input.orgSlug}/equipe`);
+  return { ok: true as const };
 }
 
 export async function inviteToSuccursale(input: {
